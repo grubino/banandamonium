@@ -1,0 +1,28 @@
+@(playerCount: Int)
+
+<html>
+  <head>
+    <script>
+
+      var game_settings = {
+        player_count: @playerCount,
+        layer_colors: ["#aa6655", "#afafaf", "#abbf44", "#23421f", "#ab8942", "#010aff", "#ababab"],
+        monkey_count: 7,
+        max_stack: 2,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        sprite_scale: 1.2
+      };
+
+      var spriteSheetImage = document.createElement('img');
+      spriteSheetImage.src = "@routes.Assets.at("images/locke_spritesheet.gif")";
+
+    </script>
+    <script src=@routes.Assets.at("javascripts/board.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/create.min.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/game.js") type="text/javascript"></script>
+    <link href=@routes.Assets.at("stylesheets/main.css") rel="stylesheet"/>
+  </head>
+  <body onload="init(spriteSheetImage);">
+  </body>
+</html>
