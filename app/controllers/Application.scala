@@ -1,9 +1,82 @@
 package controllers
 
-import play.api._
-import play.api.mvc._
+import java.util.concurrent.TimeUnit
 
-object Application extends Controller {
+import model._
+import play.api.mvc._
+import play.api.Play.current
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
+import play.modules.reactivemongo.{ReactiveMongoApi, ReactiveMongoComponents, MongoController}
+import reactivemongo.api.gridfs.GridFS
+import reactivemongo.api.{Cursor, DefaultDB, MongoConnection, MongoDriver}
+import play.modules.reactivemongo.json.collection._
+import play.modules.reactivemongo.json._
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
+import scala.util.Random
+
+object JsonFormats {
+  implicit val diceRollsFormat = Json.format[DiceRolls]
+  implicit val bananaCardFormat = Json.format[BananaCard]
+  implicit val bananaCardsFormat = Json.format[BananaCards]
+  implicit val placeFormat = Json.format[Place]
+  implicit val boardFormat = Json.format[Board]
+  implicit val moveFormat = Json.format[Move]
+}
+
+object Application extends Controller with MongoController with ReactiveMongoComponents {
+
+  import JsonFormats._
+
+  val reactiveMongoApi: ReactiveMongoApi = new ReactiveMongoApi {
+    override def driver: MongoDriver = new MongoDriver
+    override def gridFS: GridFS[JSONSerializationPack.type] = new GridFS[JSONSerializationPack.type](db)
+    override def db: DefaultDB = DefaultDB(play.Play.application().configuration().getString("mongo.dbname"), connection)
+    override def connection: MongoConnection = driver.connection(List(play.Play.application().configuration().getString("mongo.host")+":27017"))
+  }
+
+  val boardsCollection: JSONCollection = db.collection[JSONCollection]("boards")
+  val diceRollsCollection: JSONCollection = db.collection[JSONCollection]("diceRolls")
+  val movesCollection: JSONCollection = db.collection[JSONCollection]("moves")
+  val r = new Random()
+
+  def roll(id: String) = Action.async {
+    request =>
+      val boardFuture: Future[Option[Board]] = boardsCollection.find(Json.obj("gameId" -> JsString(id))).sort(Json.obj("turnIndex" -> -1)).one[Board]
+      boardFuture.map {
+        board =>
+          board match {
+            case Some(b) =>
+              // TODO - create unique index on {gameId: 1, turnIndex: -1}
+              val diceRollsInts: List[Int] = (for(i <- 0 to b.diceCount; diceRoll = Math.abs(r.nextInt % 6 + 1)) yield diceRoll).toList
+              val diceRolls = DiceRolls(id, b.turnIndex, diceRollsInts)
+              val insertFuture = diceRollsCollection.insert(diceRolls).map {
+                lastError => Created(Json.toJson(diceRolls))
+              }
+              Await.result(insertFuture, Duration(1000, TimeUnit.MILLISECONDS))
+            case None =>
+              NotFound("the board you requested: "+id+" does not exist.")
+          }
+      }
+  }
+
+  def move(id: String) = Action.async(parse.json) {
+    request =>
+      request.body.validate[List[Move]].map {
+        newMoves =>
+          boardsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[Board].map {
+            case Some(board) =>
+              val dice = Future.successful
+          }
+          movesCollection.insert[List[Move]](newMoves).map {
+            lastError =>
+                Ok
+          }
+    }.getOrElse(Future.successful(BadRequest("invalid move object")))
+  }
 
   def index(playerCount: Int) = Action {
     Ok(views.html.banandamonium(playerCount))
@@ -13,4 +86,26 @@ object Application extends Controller {
     Ok("SUCCESS")
   }
 
+  def getBoard(id: String) = Action.async {
+    // TODO - create unique index on {gameId: 1, turnIndex: -1}
+    val boardFuture: Future[Option[Board]] = boardsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[Board]
+    boardFuture.map {
+      board =>
+        board match {
+          case Some(b) => Ok(Json.toJson(b))
+          case None => NotFound("board "+id+" not found")
+        }
+    }
+  }
+
+  def createBoard() = Action.async(parse.json) {
+    request =>
+      request.body.validate[Board].map {
+        newBoard =>
+          // TODO - create unique index on {gameId: 1, turnIndex: -1}
+          boardsCollection.insert(newBoard).map {
+            lastError => Created
+          }
+      }.getOrElse(Future.successful(BadRequest("invalid input")))
+  }
 }

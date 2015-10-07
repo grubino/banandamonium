@@ -6,45 +6,46 @@ function generate_moves(dice_count) {
     return moves;
 }
 
-var Board = function (player_count, monkey_count, max_stack) {
+var Board = function (id, playerCount, monkeyCount, diceCount, maxStack) {
 
+    this.gameId = id
     this.layers = [[], [], [], [], [], [], [{monkeys: []}]];
-    this.monkey_starts = [];
-    this.max_stack = max_stack;
-    this.current_player = 0;
-    this.turn_index = 0;
-    this.path_length = 0;
-    this.player_count = player_count;
+    this.monkeyStarts = [];
+    this.maxStack = maxStack;
+    this.currentPlayer = 0;
+    this.diceCount = diceCount;
+    this.turnIndex = 0;
+    this.bananaCards = {deck: [], active: [], discard: []};
+    this.playerCount = playerCount;
 
-    for (var i = 0; i < player_count; i++) {
+    for (var i = 0; i < playerCount; i++) {
 
-        this.monkey_starts[i] = monkey_count;
+        this.monkeyStarts[i] = monkeyCount;
         this.layers[0] =
-            this.layers[0].concat([{monkeys: [], slide_down: i},
+            this.layers[0].concat([{monkeys: [], slideDown: i},
                 {monkeys: []},
                 {monkeys: []},
-                {monkeys: [], slide_up: (i + 1) % player_count}]);
+                {monkeys: [], slideUp: (i + 1) % playerCount}]);
         this.layers[1] =
-            this.layers[1].concat([{monkeys: [], banana_card: true, slide_down: i},
+            this.layers[1].concat([{monkeys: [], slideDown: i},
                 {monkeys: []},
                 {monkeys: []},
-                {monkeys: [], slide_up: (i + 1) % player_count}]);
+                {monkeys: [], slideUp: (i + 1) % playerCount}]);
         this.layers[2] =
-            this.layers[2].concat([{monkeys: [], slide_down: i},
+            this.layers[2].concat([{monkeys: [], slideDown: i},
                 {monkeys: []},
-                {monkeys: [], slide_up: (i + 1) % player_count, banana_card: true}]);
+                {monkeys: [], slideUp: (i + 1) % playerCount}]);
         this.layers[3] =
-            this.layers[3].concat([{monkeys: [], slide_down: i},
+            this.layers[3].concat([{monkeys: [], slideDown: i},
                 {monkeys: []},
-                {monkeys: [], slide_up: (i + 1) % player_count}]);
+                {monkeys: [], slideUp: (i + 1) % playerCount}]);
         this.layers[4] =
-            this.layers[4].concat([{monkeys: [], slide_down: i},
+            this.layers[4].concat([{monkeys: [], slideDown: i},
                 {monkeys: []},
-                {monkeys: [], slide_up: (i + 1) % player_count}]);
+                {monkeys: [], slideUp: (i + 1) % playerCount}]);
         this.layers[5] =
-            this.layers[5].concat([{monkeys: [], slide_down: i},
-                {monkeys: [], slide_up: (i + 1) % player_count}]);
-        this.path_length += 19;
+            this.layers[5].concat([{monkeys: [], slideDown: i},
+                {monkeys: [], slideUp: (i + 1) % playerCount}]);
 
     }
 
@@ -52,41 +53,50 @@ var Board = function (player_count, monkey_count, max_stack) {
 
 Board.prototype = {
 
-    next_turn: function() {
-        this.current_player = (this.current_player + 1) % this.player_count;
+    hasBananaCard: function(layer, index) {
+        if(layer === 1) {
+            return this.layers[layer][index].slideDown !== undefined;
+        } else if(layer === 2) {
+            return this.layers[layer][index].slideUp !== undefined;
+        }
+        return false;
     },
 
-    is_legal: function (layer, position, color) {
-        if(this.layers[layer][position].monkeys.length === this.max_stack) {
+    nextTurn: function() {
+        this.currentPlayer = (this.currentPlayer + 1) % this.playerCount;
+    },
+
+    isLegal: function (layer, position, color) {
+        if(this.layers[layer][position].monkeys.length === this.maxStack) {
             return this.layers[layer][position].monkeys.filter(function(monkey) {
                     return monkey === color;
-                }).length >= Math.floor(this.max_stack/2);
+                }).length >= Math.floor(this.maxStack/2);
         } else {
             return true;
         }
     },
 
-    can_bump: function (layer, position, color) {
+    canBump: function (layer, position, color) {
         var other_monkeys = this.layers[layer][position].monkeys.filter(function (x) {
             return x != color;
         });
         return other_monkeys.length == 1;
     },
 
-    slide_down: function (color, layer, index) {
+    slideDown: function (color, layer, index) {
         var monkeyIndex = this.layers[layer][index].monkeys.indexOf(color);
         if(monkeyIndex === -1) {
             return false;
         }
         if(layer === 0) {
             var slideMove = {layer: -1, index: -1, subindex: -1};
-            this.monkey_starts[color]++;
+            this.monkeyStarts[color]++;
         } else if(layer < 5) {
             var layerProgress = index / this.layers[layer].length;
             var downIndex = Math.ceil(layerProgress * this.layers[layer-1].length);
             slideMove = {layer: layer-1, index: downIndex};
-            while(!this.is_legal(slideMove.layer, slideMove.index, color)) {
-                slideMove = this.next_move(color, slideMove.layer, slideMove.index);
+            while(!this.isLegal(slideMove.layer, slideMove.index, color)) {
+                slideMove = this.nextMove(color, slideMove.layer, slideMove.index);
             }
             this.layers[slideMove.layer][slideMove.index].monkeys.push(color);
             slideMove.subindex = this.layers[slideMove.layer][slideMove.index].monkeys.length;
@@ -94,8 +104,8 @@ Board.prototype = {
             layerProgress = index / this.layers[layer].length;
             downIndex = Math.floor(layerProgress * this.layers[layer-1].length);
             slideMove = {layer: layer-1, index: downIndex};
-            while(!this.is_legal(slideMove.layer, slideMove.index, color)) {
-                slideMove = this.prev_move(color, slideMove.layer, slideMove.index);
+            while(!this.isLegal(slideMove.layer, slideMove.index, color)) {
+                slideMove = this.prevMove(color, slideMove.layer, slideMove.index);
             }
             this.layers[slideMove.layer][slideMove.index].monkeys.push(color);
             slideMove.subindex = this.layers[slideMove.layer][slideMove.index].monkeys.length;
@@ -104,77 +114,79 @@ Board.prototype = {
         return slideMove;
     },
 
-    get_ring_size: function (index) {
+    getRingSize: function (index) {
         return this.layers[index].length;
     },
 
-    get_subindex: function(layer, index) {
-        if(this.layers[layer][index].monkeys.length <= this.max_stack) {
+    getSubindex: function(layer, index) {
+        if(this.layers[layer][index].monkeys.length <= this.maxStack) {
             return this.layers[layer][index].monkeys.length;
         }
         return -1; // not allowed
     },
 
-    start_move: function(color) {
-        var index = color * Math.round(this.layers[0].length / this.player_count);
+    startMove: function(color) {
+        var index = color * Math.round(this.layers[0].length / this.playerCount);
         var layer = 0;
         return {
             layer: layer,
             index: index,
-            subindex: this.get_subindex(layer, index)
+            subindex: this.getSubindex(layer, index)
         };
     },
 
-    next_move: function(color, layer, index) {
+    nextMove: function(color, layer, index) {
         if(layer === -1) {
-            return this.start_move(color);
+            return this.startMove(color);
         } else if(layer === this.layers.length-1) {
             return false;
+        } else if(layer === 6) {
+            return false;
         }
-        var next_layer = this.layers[layer][index].slide_up === color ? layer + 1 : layer;
-        var next_index = this.layers[layer][index].slide_up === color ? this.layers[layer+1].findIndex(function(place) {
-            return place.slide_down === color;
+        var next_layer = this.layers[layer][index].slideUp === color ? layer + 1 : layer;
+        var next_index = this.layers[layer][index].slideUp === color ? this.layers[layer+1].findIndex(function(place) {
+            return place.slideDown === color;
         }) : (index + 1) % this.layers[layer].length;
         var next_spot = {
             layer: next_layer,
             index: next_index,
-            subindex: this.get_subindex(next_layer, next_index)
+            subindex: this.getSubindex(next_layer, next_index)
         };
         return next_spot;
     },
 
-    prev_move: function(color, layer, index) {
-        var start_move = this.start_move(color);
+    prevMove: function(color, layer, index) {
+        var start_move = this.startMove(color);
         if(layer === start_move.layer && index === start_move.index) {
             return {layer: -1, index: -1};
         }
         return {
-            layer: this.layers[layer][index].slide_down === color ? layer - 1 : layer,
-            index: this.layers[layer][index].slide_down === color ? this.layers[layer-1].findIndex(function(place) {
-                return place.slide_up === color;
+            layer: this.layers[layer][index].slideDown === color ? layer - 1 : layer,
+            index: this.layers[layer][index].slideDown === color ? this.layers[layer-1].findIndex(function(place) {
+                return place.slideUp === color;
             }) : (index - 1) % this.layers[layer].length
         };
     },
 
-    move_target: function(color, layer, index, distance) {
+    moveTarget: function(color, layer, index, distance) {
         var prev = {layer: layer, index: index};
         var next = prev;
         for(var i = 0; i < distance; i++) {
-            next = this.next_move(color, prev.layer, prev.index);
+            next = this.nextMove(color, prev.layer, prev.index);
             if(!next) { return false; }
             prev = next;
         }
         return next;
     },
 
-    cascade_bumps: function() {
+    cascadeBumps: function() {
         var bumps = [];
         this.layers.forEach(function(layer, i) {
             layer.forEach(function (position, j) {
-                if(position.monkeys.length > this.max_stack) {
+                if(position.monkeys.length > this.maxStack) {
                     position.monkeys.sort();
-                    var monkey_counts = new Array(this.player_count);
-                    monkey_counts.fill(0, 0, this.player_count);
+                    var monkey_counts = new Array(this.playerCount);
+                    monkey_counts.fill(0, 0, this.playerCount);
                     position.monkeys.forEach(function(color) {
                         monkey_counts[color]++;
                     }, this);
@@ -185,7 +197,7 @@ Board.prototype = {
                             minority_monkey_index = k;
                         }
                     }
-                    var after_bump = this.slide_down(minority_monkey_index, i, j);
+                    var after_bump = this.slideDown(minority_monkey_index, i, j);
                     if(after_bump) {
                         bumps = bumps.concat({
                             layer: i,
@@ -198,7 +210,7 @@ Board.prototype = {
             }, this);
         }, this);
         if(bumps.length > 0) {
-            bumps = bumps.concat(this.cascade_bumps());
+            bumps = bumps.concat(this.cascadeBumps());
         }
         return bumps;
     }
