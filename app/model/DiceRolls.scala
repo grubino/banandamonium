@@ -1,5 +1,7 @@
 package model
 
+import play.api.libs.json.Json
+
 /**
  * Created by greg.rubino on 10/7/15.
  */

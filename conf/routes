@@ -3,9 +3,11 @@
 # ~~~~
 
 # Home page
+POST    /move/:id                   controllers.Application.move(id: String)
 POST    /boards                     controllers.Application.createBoard()
 GET     /boards/:id                 controllers.Application.getBoard(id: String)
 GET     /roll/:id                   controllers.Application.roll(id: String)
+GET     /rolls/:id                  controllers.Application.getRolls(id: String)
 GET     /banandamonium/:playerCount controllers.Application.index(playerCount: Int)
 GET     /healthcheck                controllers.Application.healthcheck
 # Map static resources from the /public folder to the /assets URL path

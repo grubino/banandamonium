@@ -1,5 +1,7 @@
 package model
 
+import play.api.libs.json.Json
+
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
@@ -16,11 +18,12 @@ case class Board(gameId: String,
                  playerCount: Int,
                  bananaCards: BananaCards) {
 
+
   private def nextIndex(playerId: Int, positionTuple: (Int, Int)): (Int, Int) = {
     val layerIndex = positionTuple._1
     val placeIndex = positionTuple._2
     if(layerIndex == -1 & placeIndex == -1) {
-      (0, layers.head.indexWhere(p => p.getSlideUp == playerId))
+      (0, layers.head.indexWhere(p => p.getSlideDown == playerId))
     } else {
       val slideUp = layers(layerIndex)(placeIndex).getSlideUp == playerId
       val newLayerIndex = if(slideUp) { layerIndex + 1 } else { layerIndex }
@@ -48,14 +51,14 @@ case class Board(gameId: String,
   private def findLayerOverflows(index: Int): List[(Int, Int)] = {
     val layer = layers(index)
     val layerOverflows = for(
-      placeIndex <- 0 to layer.length;
+      placeIndex <- 0 to layer.length-1;
       overflow = (index, placeIndex)
       if layer(placeIndex).monkeys.length > maxStack) yield overflow
     layerOverflows.toList
   }
 
   private def findOverflows(): List[(Int, Int)] = {
-    val overflows = for(layerIndex <- 0 to layers.length; layerOverflows = findLayerOverflows(layerIndex)) yield layerOverflows
+    val overflows = for(layerIndex <- 0 to layers.length-1; layerOverflows = findLayerOverflows(layerIndex)) yield layerOverflows
     overflows.reduce((l, m) => l ++ m)
   }
 
@@ -119,25 +122,42 @@ case class Board(gameId: String,
 
   }
 
+  private def updatedLayers(playerId: Int, monkeyCount: Int, end: (Int, Int)): Vector[Vector[Place]] = {
+
+    val targetPlace = layers(end._1)(end._2)
+    if(targetPlace.monkeys.length + monkeyCount == maxStack && !canBump(playerId, monkeyCount, targetPlace)) {
+      throw new IllegalStateException("too many monkeys to one spot")
+    }
+    val updatedTargetPlace = targetPlace.addMonkeys(playerId, monkeyCount)
+    layers.updated(end._1, updatedLayer(layers(end._1), updatedTargetPlace, end._2))
+
+  }
+
   private def awardBananaCard(landingPlace: Place): BananaCards = {
     if(bananaCards.deck.nonEmpty) {
       BananaCards(bananaCards.deck.tail, bananaCards.deck.head :: bananaCards.active, bananaCards.discard)
-    } else {
+    } else if(bananaCards.discard.nonEmpty) {
       val r = new Random
       val shuffled = r.shuffle(bananaCards.discard)
       BananaCards(shuffled.tail, shuffled.head :: bananaCards.active, List())
+    } else {
+      bananaCards
     }
   }
 
   private def moveMonkeys(playerId: Int, monkeyCount: Int, start: (Int, Int), end: (Int, Int)): Board = {
-    val newMonkeyStarts = if(start._1 == -1 & start._2 == -1) {
-      monkeyStarts.updated(playerId, monkeyStarts(playerId) - 1)
-    } else {
-      monkeyStarts
-    }
-    val updatedLayersEnd = updatedLayers(playerId, monkeyCount, start, end)
+
     val updatedBananaCards = awardBananaCard(layers(end._1)(end._2))
-    Board(gameId, updatedLayersEnd, newMonkeyStarts, maxStack, diceCount, currentPlayer, turnIndex, playerCount, updatedBananaCards)
+
+    if(start._1 == -1 & start._2 == -1) {
+      val newMonkeyStarts = monkeyStarts.updated(playerId, monkeyStarts(playerId) - 1)
+      val updatedLayers: Vector[Vector[Place]] = this.updatedLayers(playerId, monkeyCount, end)
+      Board(gameId, updatedLayers, newMonkeyStarts, maxStack, diceCount, currentPlayer, turnIndex, playerCount, updatedBananaCards)
+    } else {
+      val updatedLayers: Vector[Vector[Place]] = this.updatedLayers(playerId, monkeyCount, start, end)
+      Board(gameId, updatedLayers, monkeyStarts, maxStack, diceCount, currentPlayer, turnIndex, playerCount, updatedBananaCards)
+    }
+
   }
 
   private def advance(playerId: Int, layerIndex: Int, placeIndex: Int, monkeyCount: Int, distance: Int): Board = {
@@ -152,25 +172,36 @@ case class Board(gameId: String,
     advance(move.playerId, move.layerIndex, move.placeIndex, move.monkeyCount, move.distance.sum).resolveBumps()
   }
 
+  private def incrementTurn(): Board = {
+    val newCurrentPlayer =
+      if(bananaCards.active.nonEmpty) {
+        currentPlayer
+      } else {
+        (currentPlayer+1)%playerCount
+      }
+    Board(gameId, layers, monkeyStarts, maxStack, diceCount, currentPlayer, turnIndex+1, playerCount, bananaCards)
+  }
+
   private def extractDice(move: Move, dice: List[Int]): List[Int] = {
     dice.diff(move.distance)
   }
 
   def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
+    if(diceDecisions.isEmpty) { this }
     val decision = diceDecisions.head
     val remainingDecisions = diceDecisions.tail
     val remainingDice = extractDice(decision, diceRolls)
-    if(diceRolls.length > diceCount || remainingDice.length == diceRolls.length) {
+    if(diceRolls.length > diceCount || (remainingDice.nonEmpty && remainingDice.length == diceRolls.length)) {
       throw new IllegalStateException("illegal move")
     } else if(remainingDecisions.nonEmpty) {
       makeMove(decision).consumeDice(remainingDecisions, remainingDice)
     } else {
-      makeMove(decision)
+      makeMove(decision).incrementTurn()
     }
   }
 
   private def updatedLayer(layer: Vector[Place], newPlace: Place, placeIndex: Int): Vector[Place] = {
-    layer updated(placeIndex, newPlace)
+    layer.updated(placeIndex, newPlace)
   }
 
 }

@@ -3,13 +3,13 @@ package controllers
 import java.util.concurrent.TimeUnit
 
 import model._
+import model.Board._
 import play.api.mvc._
 import play.api.Play.current
 import play.api.libs.json._
-import play.api.libs.functional.syntax._
 import play.modules.reactivemongo.{ReactiveMongoApi, ReactiveMongoComponents, MongoController}
 import reactivemongo.api.gridfs.GridFS
-import reactivemongo.api.{Cursor, DefaultDB, MongoConnection, MongoDriver}
+import reactivemongo.api.{ReadPreference, DefaultDB, MongoConnection, MongoDriver}
 import play.modules.reactivemongo.json.collection._
 import play.modules.reactivemongo.json._
 
@@ -18,18 +18,9 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 import scala.util.Random
 
-object JsonFormats {
-  implicit val diceRollsFormat = Json.format[DiceRolls]
-  implicit val bananaCardFormat = Json.format[BananaCard]
-  implicit val bananaCardsFormat = Json.format[BananaCards]
-  implicit val placeFormat = Json.format[Place]
-  implicit val boardFormat = Json.format[Board]
-  implicit val moveFormat = Json.format[Move]
-}
-
 object Application extends Controller with MongoController with ReactiveMongoComponents {
 
-  import JsonFormats._
+  import JsonFormatters._
 
   val reactiveMongoApi: ReactiveMongoApi = new ReactiveMongoApi {
     override def driver: MongoDriver = new MongoDriver
@@ -40,41 +31,57 @@ object Application extends Controller with MongoController with ReactiveMongoCom
 
   val boardsCollection: JSONCollection = db.collection[JSONCollection]("boards")
   val diceRollsCollection: JSONCollection = db.collection[JSONCollection]("diceRolls")
-  val movesCollection: JSONCollection = db.collection[JSONCollection]("moves")
+  val turnsCollection: JSONCollection = db.collection[JSONCollection]("turns")
   val r = new Random()
 
+  private def getCurrentRolls(id: String): Future[List[DiceRolls]] = {
+    diceRollsCollection.find(Json.obj("gameId" -> id)).cursor[DiceRolls](ReadPreference.primary).collect[List]()
+  }
+
+  private def getCurrentBoard(id: String): Future[Board] = {
+    boardsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[Board].map {
+      case Some(board) => board
+    }
+  }
+
+  private def getBoardState(id: String): Future[(Board, List[DiceRolls])] = {
+    getCurrentBoard(id) zip getCurrentRolls(id)
+  }
+
   def roll(id: String) = Action.async {
+    getCurrentBoard(id) flatMap {
+      board =>
+        // TODO - create unique index on {gameId: 1, turnIndex: -1}
+        val diceRollsInts: List[Int] = (for(i <- 1 to board.diceCount; diceRoll = Math.abs(r.nextInt % 6) + 1) yield diceRoll).toList
+        val diceRolls = DiceRolls(id, board.turnIndex, diceRollsInts)
+        val insertFuture = diceRollsCollection.insert(diceRolls).map {
+          lastError => Created(Json.toJson(diceRolls))
+        }
+        insertFuture
+    }
+  }
+
+  def getRolls(id: String) = Action.async {
     request =>
-      val boardFuture: Future[Option[Board]] = boardsCollection.find(Json.obj("gameId" -> JsString(id))).sort(Json.obj("turnIndex" -> -1)).one[Board]
-      boardFuture.map {
-        board =>
-          board match {
-            case Some(b) =>
-              // TODO - create unique index on {gameId: 1, turnIndex: -1}
-              val diceRollsInts: List[Int] = (for(i <- 0 to b.diceCount; diceRoll = Math.abs(r.nextInt % 6 + 1)) yield diceRoll).toList
-              val diceRolls = DiceRolls(id, b.turnIndex, diceRollsInts)
-              val insertFuture = diceRollsCollection.insert(diceRolls).map {
-                lastError => Created(Json.toJson(diceRolls))
-              }
-              Await.result(insertFuture, Duration(1000, TimeUnit.MILLISECONDS))
-            case None =>
-              NotFound("the board you requested: "+id+" does not exist.")
-          }
+      getCurrentRolls(id) map {
+        rolls => Ok(Json.toJson(rolls))
       }
   }
 
   def move(id: String) = Action.async(parse.json) {
-    request =>
-      request.body.validate[List[Move]].map {
-        newMoves =>
-          boardsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[Board].map {
-            case Some(board) =>
-              val dice = Future.successful
-          }
-          movesCollection.insert[List[Move]](newMoves).map {
-            lastError =>
-                Ok
-          }
+    request => request.body.validate[Turn].map {
+      turn => getBoardState(id).map {
+        state: (Board, List[DiceRolls]) =>
+          val board = state._1
+          val rolls = state._2
+          board.consumeDice(turn.moves, rolls.flatMap(r => r.diceRolls))
+      }.map {
+        newBoard => boardsCollection.insert(newBoard).zip(turnsCollection.insert(turn))
+      }.map {
+        errorTuple => Ok(Json.toJson(turn))
+      }.recover {
+        case e: Throwable => BadRequest("could not advance board: "+e.getMessage)
+      }
     }.getOrElse(Future.successful(BadRequest("invalid move object")))
   }
 
@@ -88,13 +95,9 @@ object Application extends Controller with MongoController with ReactiveMongoCom
 
   def getBoard(id: String) = Action.async {
     // TODO - create unique index on {gameId: 1, turnIndex: -1}
-    val boardFuture: Future[Option[Board]] = boardsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[Board]
-    boardFuture.map {
-      board =>
-        board match {
-          case Some(b) => Ok(Json.toJson(b))
-          case None => NotFound("board "+id+" not found")
-        }
+    boardsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[Board].map {
+      case Some(b) => Ok(Json.toJson(b))
+      case None => NotFound("board " + id + " not found")
     }
   }
 
@@ -104,7 +107,7 @@ object Application extends Controller with MongoController with ReactiveMongoCom
         newBoard =>
           // TODO - create unique index on {gameId: 1, turnIndex: -1}
           boardsCollection.insert(newBoard).map {
-            lastError => Created
+            lastError => Created(Json.toJson(newBoard))
           }
       }.getOrElse(Future.successful(BadRequest("invalid input")))
   }

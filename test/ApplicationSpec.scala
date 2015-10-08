@@ -1,9 +1,13 @@
+import controllers.Application
 import org.specs2.mutable._
 import org.specs2.runner._
+import org.specs2.mock._
 import org.junit.runner._
 
 import play.api.test._
 import play.api.test.Helpers._
+
+
 
 /**
  * Add your spec here.
@@ -15,7 +19,7 @@ class ApplicationSpec extends Specification {
 
   "Application" should {
 
-    "send 404 on a bad request" in new WithApplication{
+    "send 404 on a bad request" in new WithApplication {
       route(FakeRequest(GET, "/boum")) must beNone
     }
 

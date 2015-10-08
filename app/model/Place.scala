@@ -1,9 +1,12 @@
 package model
 
+import play.api.libs.json.Json
+
 /**
  * Created by greg.rubino on 10/2/15.
  */
 case class Place(monkeys: List[Int], slideUp: Option[Int], slideDown: Option[Int]) {
+
   def removeMonkeys(playerId: Int, monkeyCount: Int): Place = {
     if(monkeyCount == 1) {
       removeOneMonkey(playerId)
