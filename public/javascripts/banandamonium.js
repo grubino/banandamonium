@@ -130,7 +130,7 @@ function createBoardView(gameId, playerId) {
             var bg = new createjs.Shape();
             bg.graphics.beginFill("red").drawRoundRect(
                 0, 0, game_settings.width/20, game_settings.height/20, 5);
-            var label = new createjs.Text(dieVal, "bold 32px Console", "#ffffff");
+            var label = new createjs.Text(dieVal, "bold "+game_settings.height/20+"px Fixed", "#ffffff");
             label.textAlign = "center";
             label.textBaseline = "center";
             label.x = game_settings.width/40;
@@ -203,7 +203,7 @@ function createBoardView(gameId, playerId) {
 
             var rollButton = new createjs.Shape();
             rollButton.graphics.beginFill("red").drawRoundRect(0, 0, game_settings.width/10, game_settings.height/20, 10);
-            var label = new createjs.Text("Roll Dice", "bold 32px Console", "#ffffff");
+            var label = new createjs.Text("Roll Dice", "bold "+game_settings.height/20+"px Fixed", "#ffffff");
             label.textAlign = "center";
             label.textBaseline = "center";
             label.x = game_settings.width/20;
@@ -377,8 +377,14 @@ function createBoardView(gameId, playerId) {
 
             if(layers[layer][index].slideUp === color) {
                 nextMove.layer = layer+1;
-                nextMove.index = layers[nextMove.layer].findIndex(
-                    function(place) { return place.slideDown === color; });
+                if(nextMove.layer < 5) {
+                    nextMove.index = layers[nextMove.layer].findIndex(
+                        function (place) {
+                            return place.slideDown === color;
+                        });
+                } else {
+                    nextMove.index = 0;
+                }
             } else {
                 nextMove.layer = layer;
                 nextMove.index = (index+1)%layers[layer].length;
