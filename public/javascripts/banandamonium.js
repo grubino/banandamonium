@@ -178,7 +178,7 @@ function createBoardView(gameId, playerId) {
                 contentType: 'application/json',
                 data: JSON.stringify(this.turn),
                 type: "POST",
-                error: function(request, status, error) { console.log("could not move: "+error); },
+                error: function(response, status, error) { alert("could not move: "+JSON.stringify(response)); },
             })
         },
 
@@ -190,7 +190,7 @@ function createBoardView(gameId, playerId) {
                     cache: false,
                     url: '/roll/'+gameId+'/'+playerId,
                     dataType: 'json',
-                    error: function(request, status, error) { console.log("could not roll: "+error); },
+                    error: function(response, status, error) { alert("could not roll: "+JSON.stringify(response)); },
                     success: this.postRoll.bind(this)
                 });
 
@@ -239,9 +239,15 @@ function createBoardView(gameId, playerId) {
                 polygon.graphics.beginFill(color).drawPolyStar(this.origin.x, this.origin.y, factor, this.model.get('playerCount'), 0, -90).endFill();
                 this.layers.push(this.stage.addChild(polygon));
 
-                path.forEach(function(point) {
+                path.forEach(function(point, k) {
                     var pathPoint = new createjs.Shape();
-                    pathPoint.graphics.beginFill("black").drawCircle(point.x+this.spriteSize.width/2, point.y+this.spriteSize.height, this.spriteSize.width/10).endFill();
+                    if(j === 1 && k % 4 === 0) {
+                        pathPoint.graphics.beginFill("yellow").drawCircle(point.x+this.spriteSize.width/2, point.y+this.spriteSize.height, this.spriteSize.width/5).endFill();
+                    } else if(j === 2 && (k+1) % 3 === 0) {
+                        pathPoint.graphics.beginFill("yellow").drawCircle(point.x+this.spriteSize.width/2, point.y+this.spriteSize.height, this.spriteSize.width/5).endFill();
+                    } else {
+                        pathPoint.graphics.beginFill("black").drawCircle(point.x + this.spriteSize.width / 2, point.y + this.spriteSize.height, this.spriteSize.width / 10).endFill();
+                    }
                     this.stage.addChild(pathPoint);
                 }, this);
                 this.paths.push(path);

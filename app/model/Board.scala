@@ -61,6 +61,11 @@ case class Board(gameId: String,
       (newLayerIndex, newPlaceIndex)
     }
   }
+
+  private def checkWinCondition(playerId: Int): Boolean = {
+    layers.takeRight(2).flatten.map(_.monkeys.count(_.playerId == playerId)).sum >= 5
+  }
+
   private def targetIndex(playerId: Int, positionTuple: (Int, Int), distance: Int): (Int, Int) = {
     if(distance == 1) {
       nextIndex(playerId, positionTuple)
@@ -254,19 +259,29 @@ case class Board(gameId: String,
   }
 
   def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
-    if(diceDecisions.isEmpty) { this }
-    val decision = diceDecisions.head
-    if(decision.playerId != currentPlayer) {
-      throw new IllegalArgumentException("it is not player "+decision.playerId+"'s turn")
-    }
-    val remainingDecisions = diceDecisions.tail
-    val remainingDice = extractDice(decision, diceRolls)
-    if(diceRolls.length > diceCount || (remainingDice.nonEmpty && remainingDice.length == diceRolls.length)) {
-      throw new IllegalStateException("illegal move")
-    } else if(remainingDecisions.nonEmpty) {
-      makeMove(decision).consumeDice(remainingDecisions, remainingDice)
+    val winners: IndexedSeq[Boolean] =
+      for(i <- 0 to playerCount-1; won = checkWinCondition(i)) yield won;
+    if(winners.count(_ == true) == 1) {
+      this
+    } else if(winners.count(_ == true) > 1) {
+      throw new IllegalStateException("there can be only one!")
     } else {
-      makeMove(decision).incrementTurn()
+      if (diceDecisions.isEmpty) {
+        this
+      }
+      val decision = diceDecisions.head
+      if (decision.playerId != currentPlayer) {
+        throw new IllegalArgumentException("it is not player " + decision.playerId + "'s turn")
+      }
+      val remainingDecisions = diceDecisions.tail
+      val remainingDice = extractDice(decision, diceRolls)
+      if (diceRolls.length > diceCount || (remainingDice.nonEmpty && remainingDice.length == diceRolls.length)) {
+        throw new IllegalStateException("illegal move")
+      } else if (remainingDecisions.nonEmpty) {
+        makeMove(decision).consumeDice(remainingDecisions, remainingDice)
+      } else {
+        makeMove(decision).incrementTurn()
+      }
     }
   }
 
