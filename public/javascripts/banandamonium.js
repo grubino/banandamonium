@@ -75,6 +75,12 @@ function createBoardView(gameId, playerId) {
 
         _generatePath: function* (layerIndex, spriteSize, path_factor) {
 
+            if(layerIndex === 5) {
+                yield {
+                    x: this.origin.x - spriteSize.width/2,
+                    y: this.origin.y - spriteSize.height
+                };
+            }
             var sideLength = Math.floor(this.model.get('layers')[layerIndex].length / this.model.get('playerCount'));
             for(var i = 0; this.model.get('playerCount') > i; i++) {
                 var coord = this._getPolygonVertex(path_factor, i);

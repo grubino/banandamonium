@@ -46,7 +46,11 @@ case class Board(gameId: String,
       val newLayerIndex = if(slideUp) { layerIndex+1 } else { layerIndex }
       val newPlaceIndex =
         if(slideUp) {
-          layers(layerIndex+1) indexWhere(p => p.getSlideDown == playerId)
+          if(newLayerIndex < 5) {
+            layers(layerIndex + 1) indexWhere (p => p.getSlideDown == playerId)
+          } else {
+            0
+          }
         } else {
           (placeIndex+1)%layers(layerIndex).length
         }
@@ -279,13 +283,13 @@ object LayerGenerator {
   def generateLayers(playerCount: Int): Vector[Vector[Place]] = {
     (for(
       i <- 0 to 5;
-      layer = generateLayer(playerCount, i)
+      layer = if(i < 5) generateLayer(playerCount, i) else Vector(Place(List(), None, None))
     ) yield layer).toVector
   }
   private def generateLayer(playerCount: Int, layerIndex: Int): Vector[Place] = {
     (for(
-      i <- 0 to playerCount * sideLength(layerIndex) - 1;
-      place = Place(List(), getSlideUp(playerCount, layerIndex, i), getSlideDown(playerCount, layerIndex, i))
+      i <- 1 to playerCount * sideLength(layerIndex);
+      place = Place(List(), getSlideUp(playerCount, layerIndex, i-1), getSlideDown(playerCount, layerIndex, i-1))
     ) yield place).toVector
   }
   private def getSlideUp(playerCount: Int, layerIndex: Int, placeIndex: Int): Option[Int] = {
@@ -305,7 +309,7 @@ object LayerGenerator {
       case 2 => 3
       case 3 => 3
       case 4 => 2
-      case 5 => 1
+      case 5 => 0
     }
   }
 }
