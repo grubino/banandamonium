@@ -220,7 +220,7 @@ function createBoardView(gameId, playerId) {
             for (var j = 0; j < this.model.get('layers').length; j++) {
 
                 var factor = this._getPolygonScaleFactor(limitingDimension, j);
-                var path_factor = factor - (limitingDimension / 20) / 2;
+                var path_factor = factor - (limitingDimension / 12) / 2;
                 var color = game_settings.layerColors[j];
 
                 var path = [];
