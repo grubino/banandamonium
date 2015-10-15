@@ -48,11 +48,15 @@ case class Board(gameId: String,
         if(slideUp) {
           if(newLayerIndex < 5) {
             layers(layerIndex + 1) indexWhere (p => p.getSlideDown == playerId)
-          } else {
+          } else if(newLayerIndex == 5) {
             0
+          } else {
+            throw new IllegalArgumentException("inaccessible layer")
           }
-        } else {
+        } else if(layerIndex < 5) {
           (placeIndex+1)%layers(layerIndex).length
+        } else {
+          throw new IllegalArgumentException("there is nothing beyond the fig tree")
         }
       (newLayerIndex, newPlaceIndex)
     }
