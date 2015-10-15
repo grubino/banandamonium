@@ -11,5 +11,6 @@ GET     /roll/:id/:turnIndex        @controllers.Application.roll(id: String, tu
 GET     /rolls/:id                  @controllers.Application.getRolls(id: String)
 GET     /play/:gameId/:playerId     @controllers.Application.index(gameId: String, playerId: Int)
 GET     /healthcheck                @controllers.Application.healthcheck
+DELETE  /boards/:id                 @controllers.Application.dropBoard(id: String)
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               @controllers.Assets.at(path="/public", file)

@@ -24,6 +24,16 @@ class Application @Inject() (val reactiveMongoApi: ReactiveMongoApi)
   val turnsCollection: JSONCollection = db.collection[JSONCollection]("turns")
   val r = new Random()
 
+  private def dropBoardState(id: String): Future[Result] = {
+    boardsCollection.remove(Json.obj("gameId" -> id)).flatMap {
+      _ => diceRollsCollection.remove(Json.obj("gameId" -> id))
+    }.flatMap {
+      _ => turnsCollection.remove(Json.obj("gameId" -> id))
+    }.flatMap {
+      _ => Future.successful(NoContent)
+    }
+  }
+
   private def getCurrentRolls(id: String): Future[Option[DiceRolls]] = {
     diceRollsCollection.find(Json.obj("gameId" -> id)).sort(Json.obj("turnIndex" -> -1)).one[DiceRolls]
   }
@@ -122,6 +132,10 @@ class Application @Inject() (val reactiveMongoApi: ReactiveMongoApi)
 
   def healthcheck = Action {
     Ok("SUCCESS")
+  }
+
+  def dropBoard(id: String) = Action.async {
+    dropBoardState(id)
   }
 
   def getBoard(id: String, turnIndex: Int) = Action.async {
