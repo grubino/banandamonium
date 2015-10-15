@@ -3,3 +3,6 @@ canvas   {
     height: 100%;
     margin: 0px;
 }
+#game-controls {
+    z-index: 10000;
+}

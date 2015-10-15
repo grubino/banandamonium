@@ -3,11 +3,9 @@ import org.specs2.mutable._
 import org.specs2.runner._
 import org.specs2.mock._
 import org.junit.runner._
-
+import play.api.Play.current
 import play.api.test._
 import play.api.test.Helpers._
-
-
 
 /**
  * Add your spec here.
@@ -19,20 +17,24 @@ class ApplicationSpec extends Specification {
 
   "Application" should {
 
-    "send 404 on a bad request" in new WithApplication {
+    "send 404 on a bad request" in {
       route(FakeRequest(GET, "/boum")) must beNone
     }
 
-    "render the index page" in new WithApplication{
-      val home = route(FakeRequest(GET, "/")).get
-
-      status(home) must equalTo(OK)
-      contentType(home) must beSome.which(_ == "text/html")
-
+    "pass health check" in new WithApplication {
+      val healthCheck = route(FakeRequest(GET, "/healthcheck")).get
+      status(healthCheck) must equalTo(OK)
+      contentType(healthCheck) must beSome.which(_ == "text/plain")
     }
 
-    "call the /roll/id endpoint" in new WithApplication {
-      val roll = route(FakeRequest(POST, "/roll/testboard")).get
+    "render the board page" in {
+      val home = controllers.Application.index("newBoard")(FakeRequest())
+      status(home) must equalTo(OK)
+      contentType(home) must beSome.which(_ == "text/html")
+    }
+
+    "call the /roll/id endpoint" in {
+      val roll = controllers.Application.roll("newBoard")(FakeRequest())
       status(roll) must equalTo(CREATED)
       contentType(roll) must beSome.which(_ == "application/json")
     }

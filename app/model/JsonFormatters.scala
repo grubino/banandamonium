@@ -9,6 +9,7 @@ object JsonFormatters {
   implicit val moveFormat = Json.format[Move]
   implicit val bananaCardFormat = Json.format[BananaCard]
   implicit val bananaCardsFormat = Json.format[BananaCards]
+  implicit val monkeyFormat = Json.format[Monkey]
   implicit val placeFormat = Json.format[Place]
   implicit val boardFormat = Json.format[Board]
   implicit val diceRollsFormat = Json.format[DiceRolls]

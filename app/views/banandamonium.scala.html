@@ -1,22 +1,24 @@
-@(playerCount: Int)
+@(gameId: String, playerId: Int)
 
 <html>
   <head>
+    <script src=@routes.Assets.at("javascripts/create.min.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/jquery.min.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/underscore-min.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/backbone-min.js") type="text/javascript"></script>
     <script>
 
       var game_settings = {
-        playerCount: @playerCount,
         layerColors: ["#aa6655", "#afafaf", "#abbf44", "#23421f", "#ab8942", "#010aff", "#ababab"],
-        monkeyCount: 7,
-        maxStack: 2,
         width: window.innerWidth,
         height: window.innerHeight,
         spriteScale: 1.5,
-        diceCount: 2,
         baseUrl: "http://localhost:9000"
       };
 
       var spriteSheetUrls = ["@routes.Assets.at("images/locke_spritesheet.gif")", "@routes.Assets.at("images/figaro_spritesheet.gif")", "@routes.Assets.at("images/shadow_spritesheet.gif")", "@routes.Assets.at("images/magiclady_spritesheet.gif")", "@routes.Assets.at("images/sabin_spritesheet.gif")"];
+      var gameId = "@gameId";
+      var playerId = @playerId;
 
       var spriteSheetImages = spriteSheetUrls.map(function(url) {
         var spriteSheet = document.createElement('img');
@@ -25,12 +27,19 @@
       });
 
     </script>
-    <script src=@routes.Assets.at("javascripts/board.js") type="text/javascript"></script>
-    <script src=@routes.Assets.at("javascripts/create.min.js") type="text/javascript"></script>
-    <script src=@routes.Assets.at("javascripts/game.js") type="text/javascript"></script>
-    <script src=@routes.Assets.at("javascripts/jquery.min.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/banandamonium.js") type="text/javascript"></script>
+    <script>
+    function loadGame() {
+      createBoardModel(gameId);
+      createBoardView(gameId, playerId);
+    }
+    </script>
     <link href=@routes.Assets.at("stylesheets/main.css") rel="stylesheet"/>
   </head>
-  <body onload="init(spriteSheetImages, jQuery);">
+  <body onload="loadGame();">
+    <menu id="game-controls">
+      <div id="roll-container"></div>
+    </menu>
+    <canvas id="game-canvas"></canvas>
   </body>
 </html>

@@ -3,12 +3,13 @@
 # ~~~~
 
 # Home page
-POST    /move/:id                   controllers.Application.move(id: String)
-POST    /boards                     controllers.Application.createBoard()
-GET     /boards/:id                 controllers.Application.getBoard(id: String)
-GET     /roll/:id                   controllers.Application.roll(id: String)
-GET     /rolls/:id                  controllers.Application.getRolls(id: String)
-GET     /banandamonium/:playerCount controllers.Application.index(playerCount: Int)
-GET     /healthcheck                controllers.Application.healthcheck
+POST    /move/:id/:playerId         @controllers.Application.move(id: String, playerId: Int)
+GET     /newBoard/:id               @controllers.Application.createBoard(id: String, playerCount: Int ?= 4)
+GET     /boards/:id/:turnIndex      @controllers.Application.getBoard(id: String, turnIndex: Int)
+GET     /boards/:id                 @controllers.Application.getBoards(id: String)
+GET     /roll/:id/:turnIndex        @controllers.Application.roll(id: String, turnIndex: Int)
+GET     /rolls/:id                  @controllers.Application.getRolls(id: String)
+GET     /play/:gameId/:playerId     @controllers.Application.index(gameId: String, playerId: Int)
+GET     /healthcheck                @controllers.Application.healthcheck
 # Map static resources from the /public folder to the /assets URL path
-GET     /assets/*file               controllers.Assets.at(path="/public", file)
+GET     /assets/*file               @controllers.Assets.at(path="/public", file)
