@@ -184,6 +184,7 @@ function createBoardView(gameId, playerId) {
 
         rollDice: function(event) {
             event.preventDefault();
+            this.unpairSprites();
             if(this.model.get('currentPlayer') === playerId) {
 
                 $.ajax({
@@ -202,12 +203,12 @@ function createBoardView(gameId, playerId) {
             var limitingDimension = Math.min(game_settings.width, game_settings.height);
 
             var rollButton = new createjs.Shape();
-            rollButton.graphics.beginFill("red").drawRoundRect(0, 0, game_settings.width/10, game_settings.height/20, 10);
-            var label = new createjs.Text("Roll Dice", "bold "+game_settings.height/20+"px Fixed", "#ffffff");
+            rollButton.graphics.beginFill("red").drawRoundRect(0, 0, game_settings.width/8, game_settings.height/18, 10);
+            var label = new createjs.Text("Roll Dice", "bold "+game_settings.height/50+"px Fixed", "#ffffff");
             label.textAlign = "center";
             label.textBaseline = "center";
             label.x = game_settings.width/20;
-            label.y = game_settings.height/40 + 10;
+            label.y = game_settings.height/40 + 5;
 
             this.rollButton = new createjs.Container();
             this.rollButton.x = 20;
@@ -269,6 +270,7 @@ function createBoardView(gameId, playerId) {
                         color: i, layer: -1, index: -1, stackSize: 1,
                         monkeyId: this.model.get('monkeyStarts')[i][j].monkeyId
                     };
+                    sprite.addEventListener("click", this.combineSprites.bind(this));
                     sprite.play();
                     this.spriteContainer.addChild(sprite);
                     this.sprites = this.sprites.concat(sprite);
@@ -289,7 +291,7 @@ function createBoardView(gameId, playerId) {
                                 color: monkey.playerId, layer: i, index: j, stackSize: 1,
                                 monkeyId: monkey.monkeyId
                             };
-                            sprite.on("click", this.combineSprites.bind(this));
+                            sprite.addEventListener("click", this.combineSprites.bind(this));
                             sprite.play();
                             this.spriteContainer.addChild(sprite);
                             this.sprites = this.sprites.concat(sprite);
@@ -309,18 +311,37 @@ function createBoardView(gameId, playerId) {
 
         },
 
+        scaleSprite: function(sprite) {
+            sprite.scaleX = game_settings.spriteScale + sprite.bananaData.stackSize - 1;
+            sprite.scaleY = game_settings.spriteScale + sprite.bananaData.stackSize - 1;
+        },
+
         combineSprites: function(event) {
             var sprite = event.currentTarget;
-            sprite.bananaData.stackSize += 1;
-            var pairable = this.sprites.filter(function(s) {
+            var spriteLayer = sprite.bananaData.layer;
+            var spriteIndex = sprite.bananaData.index;
+            var spriteColor = sprite.bananaData.color;
+            var maxStack = this.model.get('maxStack');
+
+            sprite.bananaData.stackSize = sprite.bananaData.stackSize % maxStack + 1;
+            this.scaleSprite(sprite);
+            var pairable = this.sprites.filter(function (s) {
                 return s.bananaData.monkeyId !== sprite.bananaData.monkeyId &&
                     s.bananaData.playerId === sprite.bananaData.playerId &&
                     s.bananaData.layer === sprite.bananaData.layer &&
                     s.bananaData.index === sprite.bananaData.index;
             });
             if(pairable.length > 0) {
-
+                pairable[0].bananaData.stackSize = pairable[0].bananaData.stackSize % maxStack + 1;
+                this.scaleSprite(pairable[0])
             }
+        },
+
+        unpairSprites: function() {
+            this.sprites.forEach(function(sprite) {
+                sprite.bananaData.stackSize = 1;
+                this.scaleSprite(sprite);
+            }, this);
         },
 
         render: function() {
@@ -416,6 +437,7 @@ function createBoardView(gameId, playerId) {
 
         moveMonkeyToPosition: function(sprite, x, y) {
             var tweenedSprite = this.prepareSpriteToMove(sprite);
+            return tweenedSprite.to({x: x, y: y});
         },
 
         moveMonkeyTo: function(sprite, layer, index, subindex) {
@@ -471,6 +493,10 @@ function createBoardView(gameId, playerId) {
                 function(monkey) {
                     return monkey.monkeyId === sprite.bananaData.monkeyId;
                 })).call(function() { sprite.gotoAndStop("faceForward"); });
+            sprite.scaleX = game_settings.spriteScale;
+            sprite.scaleY = game_settings.spriteScale;
+            sprite.bananaData.stackSize = 1;
+            this.scaleSprite(sprite);
         },
 
         _onNewBoardState: function(newBoard, boards) {

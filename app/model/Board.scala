@@ -79,10 +79,12 @@ case class Board(gameId: String,
     val monkeyCount = monkeys.length
     if(place.monkeys.forall(_.playerId == playerId)) {
       false
-    } else {
+    } else if(place.monkeys.length + monkeys.length == maxStack + 1) {
       val playerCounts = for (i: Int <- place.monkeys.map(m => m.playerId).toSet;
                               n = place.monkeys.count(_.playerId == i); if i != playerId) yield n
       playerCounts.sum < (monkeyCount + place.monkeys.count(_.playerId == playerId))
+    } else {
+      false
     }
   }
 
@@ -129,9 +131,9 @@ case class Board(gameId: String,
           (location._2 * layers(endLayer).length) / layers(location._1).length +
             (if(location._1 < 5 && layers(location._1).length % layers(endLayer).length != 0) 1
               else 0)
-        if(location._1 < 5 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
+        if(location._1 < 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
           findMovableForward(List(monkey), (endLayer, firstTry))
-        } else if(location._2 >= 5 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
+        } else if(location._2 >= 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
           findMovableBackward(List(monkey), (endLayer, firstTry))
         } else {
           (endLayer, firstTry)
@@ -241,7 +243,7 @@ case class Board(gameId: String,
     if(move.monkeyCount > 1 && (move.distance.length != move.monkeyCount || !move.distance.forall(_ == move.distance.head))) {
       throw new IllegalStateException("illegal move")
     }
-    advance(move.playerId, move.layerIndex, move.placeIndex, move.monkeyCount, move.distance.sum).resolveBumps()
+    advance(move.playerId, move.layerIndex, move.placeIndex, move.monkeyCount, move.distance.sum)
   }
 
   private def incrementTurn(): Board = {
@@ -256,6 +258,12 @@ case class Board(gameId: String,
 
   private def extractDice(move: Move, dice: List[Int]): List[Int] = {
     dice.diff(move.distance)
+  }
+
+  def winner(): Int = {
+    val winners: IndexedSeq[Boolean] =
+      for(i <- 0 to playerCount-1; won = checkWinCondition(i)) yield won;
+    winners.indexWhere(_ == true)
   }
 
   def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
@@ -280,7 +288,7 @@ case class Board(gameId: String,
       } else if (remainingDecisions.nonEmpty) {
         makeMove(decision).consumeDice(remainingDecisions, remainingDice)
       } else {
-        makeMove(decision).incrementTurn()
+        makeMove(decision).resolveBumps().incrementTurn()
       }
     }
   }
