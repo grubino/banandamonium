@@ -74,18 +74,24 @@ case class Board(gameId: String,
     }
   }
 
-  private def canBump(monkeys: List[Monkey], place: Place): Boolean = {
-    val playerId = monkeys.head.playerId
-    val monkeyCount = monkeys.length
-    if(place.monkeys.forall(_.playerId == playerId)) {
+  private def canBump(playerId: Int, monkeyCount: Int, place: Place): Boolean = {
+    if(place.monkeys.length + monkeyCount <= maxStack) {
+      true
+    } else if(place.monkeys.forall(_.playerId == playerId)) {
       false
-    } else if(place.monkeys.length + monkeys.length == maxStack + 1) {
+    } else if(place.monkeys.length + monkeyCount == maxStack + 1) {
       val playerCounts = for (i: Int <- place.monkeys.map(m => m.playerId).toSet;
                               n = place.monkeys.count(_.playerId == i); if i != playerId) yield n
       playerCounts.sum < (monkeyCount + place.monkeys.count(_.playerId == playerId))
     } else {
       false
     }
+  }
+
+  private def canBump(monkeys: List[Monkey], place: Place): Boolean = {
+    val playerId = monkeys.head.playerId
+    val monkeyCount = monkeys.length
+    canBump(playerId, monkeyCount, place)
   }
 
   private def findLayerOverflows(index: Int): List[(Int, Int)] = {
@@ -163,7 +169,10 @@ case class Board(gameId: String,
   }
 
   private def isMovable(monkeys: List[Monkey], place: Place): Boolean = {
-    !(place.monkeys.length == maxStack && !canBump(monkeys, place))
+    isMovable(monkeys.head.playerId, monkeys.length, place)
+  }
+  private def isMovable(playerId: Int, monkeyCount: Int, place: Place): Boolean = {
+    !(place.monkeys.length == maxStack && !canBump(playerId, monkeyCount, place))
   }
 
   private def updatedTargetLayer(monkeys: List[Monkey], end: (Int, Int)): Vector[Vector[Place]] = {
@@ -266,6 +275,40 @@ case class Board(gameId: String,
     winners.indexWhere(_ == true)
   }
 
+  private def advanceAll(playerId: Int): Board = {
+    val moveOneOn: List[Move] =
+      if(monkeyStarts(currentPlayer).length > 0) {
+        if(isMovable(List(monkeyStarts(playerId).head),
+          layers(0).find(_.slideDown == Some(playerId)).getOrElse(
+            throw new IllegalStateException("couldn't find start place for monkey")))) {
+          List(Move(playerId, -1, -1, 1, List(1)))
+        } else List()
+    } else List()
+    val moveAllOne: List[Move] = layers.zipWithIndex.reverse.flatMap(layerTuple =>
+      layerTuple._1.zipWithIndex.
+        filter(_._1.monkeys.count(_.playerId == playerId) > 0).reverse.
+        map {
+          placeTuple =>
+            val monkeys = placeTuple._1.monkeys.filter(_.playerId == playerId)
+            (for(monkey <- monkeys; move = Move(playerId, layerTuple._2, placeTuple._2, 1, List(1))) yield move).toList
+        }).flatten.toList
+    val moves: List[Move] = moveOneOn ++ moveAllOne
+    makePossibleMoves(moves)
+  }
+
+  private def makePossibleMoves(moves: List[Move]): Board = {
+    if(moves.length >= 1) {
+      val target = targetIndex(moves.head.playerId, (moves.head.layerIndex, moves.head.placeIndex), moves.head.distance.sum)
+      if (!isMovable(moves.head.playerId, moves.head.monkeyCount, layers(target._1)(target._2))) {
+        makePossibleMoves(moves.tail)
+      } else {
+        makeMove(moves.head).makePossibleMoves(moves.tail)
+      }
+    } else {
+      this
+    }
+  }
+
   def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
     val winners: IndexedSeq[Boolean] =
       for(i <- 0 to playerCount-1; won = checkWinCondition(i)) yield won;
@@ -275,20 +318,26 @@ case class Board(gameId: String,
       throw new IllegalStateException("there can be only one!")
     } else {
       if (diceDecisions.isEmpty) {
-        this
-      }
-      val decision = diceDecisions.head
-      if (decision.playerId != currentPlayer) {
-        throw new IllegalArgumentException("it is not player " + decision.playerId + "'s turn")
-      }
-      val remainingDecisions = diceDecisions.tail
-      val remainingDice = extractDice(decision, diceRolls)
-      if (diceRolls.length > diceCount || (remainingDice.nonEmpty && remainingDice.length == diceRolls.length)) {
-        throw new IllegalStateException("illegal move")
-      } else if (remainingDecisions.nonEmpty) {
-        makeMove(decision).consumeDice(remainingDecisions, remainingDice)
+        if(diceRolls.forall(_ == 1)) {
+          advanceAll(currentPlayer).resolveBumps().incrementTurn()
+        } else {
+          this
+        }
       } else {
-        makeMove(decision).resolveBumps().incrementTurn()
+        val decision = diceDecisions.head
+        if (decision.playerId != currentPlayer) {
+          throw new IllegalArgumentException("it is not player " + decision.playerId + "'s turn")
+        }
+        val remainingDecisions = diceDecisions.tail
+        val remainingDice = extractDice(decision, diceRolls)
+        if ((diceRolls.length > diceCount && !diceRolls.forall(_ == 1)) ||
+          (remainingDice.nonEmpty && remainingDice.length == diceRolls.length)) {
+          throw new IllegalStateException("illegal move")
+        } else if (remainingDecisions.nonEmpty) {
+          makeMove(decision).consumeDice(remainingDecisions, remainingDice)
+        } else {
+          makeMove(decision).resolveBumps().incrementTurn()
+        }
       }
     }
   }

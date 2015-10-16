@@ -145,6 +145,22 @@ function createBoardView(gameId, playerId) {
             this.dice.addChild(button);
         },
 
+        createAdvanceAllButton: function() {
+            var bg = new createjs.Shape();
+            bg.graphics.beginFill("red").drawRoundRect(
+                0, 0, game_settings.width/20, game_settings.height/20, 5);
+            var label = new createjs.Text("*", "bold "+game_settings.height/20+"px Fixed", "#ffffff");
+            label.textAlign = "center";
+            label.textBaseline = "center";
+            label.x = game_settings.width/40;
+            label.y = game_settings.height/40+10;
+            var button = new createjs.Container();
+            button.x = 20;
+            button.y = game_settings.height/10;
+            button.addChild(bg, label);
+            return button;
+        },
+
         unhighlighSprites: function() {
             this.sprites.forEach(function(sprite) {
                 sprite.gotoAndStop("faceForward");
@@ -166,11 +182,23 @@ function createBoardView(gameId, playerId) {
             this.dice = new createjs.Container();
             this.turn = {playerIndex: playerId, gameId: gameId, moves: [], bananaCards: []};
             roll.diceRolls.map(function(roll) { return [roll]; }).forEach(this.createDie, this);
+            if(roll.diceRolls.filter(function(dr) { return dr == 1; }).length === roll.diceRolls.length) {
+                this.advanceAll = new createjs.Container();
+                this.advanceAll.addChild(this.createAdvanceAllButton());
+                this.advanceAll.addEventListener("click", this.moveAllTurn.bind(this));
+                this.stage.addChild(this.advanceAll);
+            }
             this.highlightSprites();
             this.stage.addChild(this.dice);
         },
 
+        moveAllTurn: function() {
+            this.turn = {playerIndex: playerId, gameId: gameId, moves: [], bananaCards: []};
+            this.executeMove();
+        },
+
         executeMove: function() {
+            this.dice.removeAllChildren();
             $.ajax({
                 cache: false,
                 url: '/move/'+gameId+'/'+playerId,
