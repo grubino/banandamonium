@@ -55,11 +55,8 @@ class Application @Inject() (val reactiveMongoApi: ReactiveMongoApi)
   }
 
   private def newRoll(gameId: String, playerId: Int, turnIndex: Int, diceCount: Int): DiceRolls = {
-/*
     val diceRollsInts: List[Int] = (for (i <- 1 to diceCount;
                                          diceRoll = Math.abs(r.nextInt % 6) + 1) yield diceRoll).toList
-*/
-    val diceRollsInts = List(1, 1)
     DiceRolls(gameId, turnIndex, diceRollsInts)
   }
 
