@@ -4,7 +4,7 @@
 
 # Home page
 POST    /move/:id/:playerId         @controllers.Application.move(id: String, playerId: Int)
-GET     /newBoard/:id               @controllers.Application.createBoard(id: String, playerCount: Int ?= 4)
+GET     /newBoard/:id               @controllers.Application.createBoard(id: String, playerCount: Int ?= 4, diceCount: Int ?= 2, maxStack: Int ?= 2)
 GET     /boards/:id/:turnIndex      @controllers.Application.getBoard(id: String, turnIndex: Int)
 GET     /boards/:id                 @controllers.Application.getBoards(id: String)
 GET     /roll/:id/:turnIndex        @controllers.Application.roll(id: String, turnIndex: Int)

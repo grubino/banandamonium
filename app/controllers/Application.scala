@@ -153,12 +153,12 @@ class Application @Inject() (val reactiveMongoApi: ReactiveMongoApi)
     }
   }
 
-  def createBoard(id: String, playerCount: Int) = Action.async {
+  def createBoard(id: String, playerCount: Int, diceCount: Int, maxStack: Int) = Action.async {
     val newBoard = Board(
       gameId = id,
       layers = LayerGenerator.generateLayers(playerCount),
       monkeyStarts = MonkeyStartGenerator.generateMonkeyStarts(playerCount, 7),
-      maxStack = 2, diceCount = 2, currentPlayer = 0, turnIndex = 0,
+      maxStack = maxStack, diceCount = diceCount, currentPlayer = 0, turnIndex = 0,
       playerCount = playerCount,
       bananaCards = BananaCards(List(), List(), List()))
     boardsCollection.insert(newBoard).map {
