@@ -1,8 +1,10 @@
 package model
 
 import play.api.libs.json.Json
-
-import scala.collection.mutable.ListBuffer
+import scalaz._
+import syntax.bitraverse._
+import std.option._
+import std.tuple._
 import scala.util.Random
 
 /**
@@ -18,59 +20,61 @@ case class Board(gameId: String,
                  playerCount: Int,
                  bananaCards: BananaCards) {
 
-  private def prevIndex(playerId: Int, positionTuple: (Int, Int)): (Int, Int) = {
-    val layerIndex = positionTuple._1
-    val placeIndex = positionTuple._2
-    if(layerIndex == -1 & placeIndex == -1)
-      (-1, -1)
-    else {
+  private def prevIndex(playerId: Int, positionTuple: Option[(Int, Int)]): (Int, Int) = {
+    positionTuple.map[(Int, Int)] {
+      pos =>
+      val layerIndex = pos._1
+      val placeIndex = pos._2
       val slideDown = layers(layerIndex)(placeIndex).getSlideDown == playerId
-      val newLayerIndex = if(slideDown) { layerIndex-1 } else { layerIndex }
+      val newLayerIndex = if (slideDown) {
+        layerIndex - 1
+      } else {
+        layerIndex
+      }
       val newPlaceIndex =
-        if(slideDown) {
-          layers(layerIndex-1) indexWhere(p => p.getSlideUp == playerId)
+        if (slideDown) {
+          layers(layerIndex - 1) indexWhere (p => p.getSlideUp == playerId)
         } else {
-          ((placeIndex-1)+layers(layerIndex).length)%layers(layerIndex).length
+          ((placeIndex - 1) + layers(layerIndex).length) % layers(layerIndex).length
         }
       (newLayerIndex, newPlaceIndex)
-    }
+    }.getOrElse(throw new IllegalStateException("cannot get prev index"))
   }
 
-  private def nextIndex(playerId: Int, positionTuple: (Int, Int)): (Int, Int) = {
-    val layerIndex = positionTuple._1
-    val placeIndex = positionTuple._2
-    if(layerIndex == -1 & placeIndex == -1) {
-      (1, layers.head.indexWhere(p => p.getSlideDown == playerId))
-    } else {
-      val slideUp = layers(layerIndex)(placeIndex).getSlideUp == playerId
-      val newLayerIndex = if(slideUp) { layerIndex+1 } else { layerIndex }
-      val newPlaceIndex =
-        if(slideUp) {
-          if(newLayerIndex < 5) {
-            layers(layerIndex + 1) indexWhere (p => p.getSlideDown == playerId)
-          } else if(newLayerIndex == 5) {
-            0
+  private def nextIndex(playerId: Int, positionTuple: Option[(Int, Int)]): (Int, Int) = {
+    positionTuple.map[(Int, Int)] {
+      pos =>
+        val layerIndex = pos._1
+        val placeIndex = pos._2
+        val slideUp = layers(layerIndex)(placeIndex).getSlideUp == playerId
+        val newLayerIndex = if(slideUp) { layerIndex+1 } else { layerIndex }
+        val newPlaceIndex =
+          if(slideUp) {
+            if(newLayerIndex < 5) {
+              layers(layerIndex + 1) indexWhere (p => p.getSlideDown == playerId)
+            } else if(newLayerIndex == 5) {
+              0
+            } else {
+              throw new IllegalArgumentException("inaccessible layer")
+            }
+          } else if(layerIndex < 5) {
+            (placeIndex+1)%layers(layerIndex).length
           } else {
-            throw new IllegalArgumentException("inaccessible layer")
+            throw new IllegalArgumentException("there is nothing beyond the fig tree")
           }
-        } else if(layerIndex < 5) {
-          (placeIndex+1)%layers(layerIndex).length
-        } else {
-          throw new IllegalArgumentException("there is nothing beyond the fig tree")
-        }
-      (newLayerIndex, newPlaceIndex)
-    }
+        (newLayerIndex, newPlaceIndex)
+    }.getOrElse((1, layers.head.indexWhere(p => p.getSlideDown == playerId)))
   }
 
   private def checkWinCondition(playerId: Int): Boolean = {
     layers.takeRight(2).flatten.map(_.monkeys.count(_.playerId == playerId)).sum >= 5
   }
 
-  private def targetIndex(playerId: Int, positionTuple: (Int, Int), distance: Int): (Int, Int) = {
+  private def targetIndex(playerId: Int, positionTuple: Option[(Int, Int)], distance: Int): (Int, Int) = {
     if(distance == 1) {
       nextIndex(playerId, positionTuple)
     } else {
-      targetIndex(playerId, nextIndex(playerId, positionTuple), distance-1)
+      targetIndex(playerId, Some(nextIndex(playerId, positionTuple)), distance-1)
     }
   }
 
@@ -118,34 +122,34 @@ case class Board(gameId: String,
           })
     }
   }
-  private def findMovableForward(monkeys: List[Monkey], location: (Int, Int)): (Int, Int) = {
+  private def findMovableForward(monkeys: List[Monkey], location: Option[(Int, Int)]): (Int, Int) = {
     val tryLocation = nextIndex(monkeys.head.playerId, location)
-    if(isMovable(monkeys, layers(location._1)(location._2))) tryLocation
-    else findMovableForward(monkeys, tryLocation)
+    if(isMovable(monkeys, layers(tryLocation._1)(tryLocation._2))) tryLocation
+    else findMovableForward(monkeys, Some(tryLocation))
   }
   private def findMovableBackward(monkeys: List[Monkey], location: (Int, Int)): (Int, Int) = {
-    val tryLocation = prevIndex(monkeys.head.playerId, location)
+    val tryLocation = prevIndex(monkeys.head.playerId, Some(location))
     if(isMovable(monkeys, layers(location._1)(location._2))) tryLocation
     else findMovableBackward(monkeys, tryLocation)
   }
 
   private def bump(monkey: Monkey, location: (Int, Int)): Board = {
     val endLayer = location._1-1
-    val endPlace: (Int, Int) =
+    val endPlace: Option[(Int, Int)] =
       if(endLayer >= 0) {
         val firstTry =
           (location._2 * layers(endLayer).length) / layers(location._1).length +
             (if(location._1 < 5 && layers(location._1).length % layers(endLayer).length != 0) 1
               else 0)
         if(location._1 < 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
-          findMovableForward(List(monkey), (endLayer, firstTry))
+          Some(findMovableForward(List(monkey), Some((endLayer, firstTry))))
         } else if(location._2 >= 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
-          findMovableBackward(List(monkey), (endLayer, firstTry))
+          Some(findMovableBackward(List(monkey), (endLayer, firstTry)))
         } else {
-          (endLayer, firstTry)
+          Some((endLayer, firstTry))
         }
-      } else (-1, -1)
-    moveMonkeys(List(monkey), location, endPlace)
+      } else None
+    moveMonkeys(List(monkey), Some(location), endPlace)
   }
 
   private def resolveBump(overflow: (Int, Int)): Board = {
@@ -207,45 +211,82 @@ case class Board(gameId: String,
   }
 
   private def withUpdatedStartLayer(monkeys: List[Monkey], start: (Int, Int), newMonkeyStarts: List[List[Monkey]]): Board = {
-    Board(gameId, updatedStartLayer(monkeys, start), newMonkeyStarts, maxStack, diceCount, currentPlayer, turnIndex, playerCount, bananaCards)
+    Board(
+      gameId,
+      updatedStartLayer(monkeys, start),
+      newMonkeyStarts,
+      maxStack,
+      diceCount,
+      currentPlayer,
+      turnIndex,
+      playerCount,
+      bananaCards)
   }
 
   private def withUpdatedTargetLayer(monkeys: List[Monkey], end: (Int, Int), newMonkeyStarts: List[List[Monkey]]): Board = {
-    Board(gameId, updatedTargetLayer(monkeys, end), newMonkeyStarts, maxStack, diceCount, currentPlayer, turnIndex, playerCount, awardBananaCard(layers(end._1)(end._2)))
+    Board(
+      gameId,
+      updatedTargetLayer(monkeys, end),
+      newMonkeyStarts,
+      maxStack,
+      diceCount,
+      currentPlayer,
+      turnIndex,
+      playerCount,
+      awardBananaCard(layers(end._1)(end._2)))
   }
 
-  private def moveMonkeys(monkeys: List[Monkey], start: (Int, Int), end: (Int, Int)): Board = {
+  private def moveMonkeys(monkeys: List[Monkey], start: Option[(Int, Int)], end: Option[(Int, Int)]): Board = {
 
     if(monkeys.isEmpty) {
       throw new IllegalArgumentException("tried to move no monkeys")
     }
-
     val playerId = monkeys.head.playerId
+
     if(!monkeys.forall(_.playerId == playerId)) {
       throw new IllegalArgumentException("tried to move multicolored monkeys")
-    } else if(start._1 == -1 && start._2 == -1) {
-      val newMonkeyStarts = monkeyStarts.updated(playerId, monkeyStarts(playerId).filter(m => !monkeys.contains(m)))
-      this.withUpdatedTargetLayer(monkeys, end, newMonkeyStarts)
-    } else if(end._1 == -1 && end._2 == -1) {
-      val newMonkeyStarts = monkeyStarts.updated(playerId, monkeyStarts(playerId) ++
-        layers(start._1)(start._2).monkeys.filter(m => monkeys.contains(m)))
-      this.withUpdatedStartLayer(monkeys, start, newMonkeyStarts)
-    } else {
-      this.
-        withUpdatedStartLayer(monkeys, start, monkeyStarts).
-        withUpdatedTargetLayer(monkeys, end, monkeyStarts)
+    }
+
+    start.map {
+      s =>
+        end.map {
+          e =>
+            this.withUpdatedStartLayer(monkeys, s, monkeyStarts).
+              withUpdatedTargetLayer(monkeys, e, monkeyStarts)
+        }.getOrElse {
+          val newMonkeyStarts = monkeyStarts.updated(playerId, monkeyStarts(playerId) ++
+            layers(s._1)(s._2).monkeys.filter(m => monkeys.contains(m)))
+          this.withUpdatedStartLayer(monkeys, s, newMonkeyStarts)
+        }
+    }.getOrElse {
+      end.map {
+        e =>
+          val newMonkeyStarts = monkeyStarts.updated(playerId, monkeyStarts(playerId).filter(m => !monkeys.contains(m)))
+          this.withUpdatedTargetLayer(monkeys, e, newMonkeyStarts)
+      }.getOrElse(this)
     }
 
   }
 
-  private def advance(playerId: Int, layerIndex: Int, placeIndex: Int, monkeyCount: Int, distance: Int): Board = {
-    val targetPosition = targetIndex(playerId, (layerIndex, placeIndex), distance)
-    val monkeys = if(layerIndex == -1 && placeIndex == -1) {
-      monkeyStarts(playerId).take(monkeyCount)
-    } else {
-      layers(layerIndex)(placeIndex).monkeys.filter(m => m.playerId == playerId).take(monkeyCount)
+  private def advance(playerId: Int,
+                      layerIndex: Option[Int],
+                      placeIndex: Option[Int],
+                      monkeyCount: Int,
+                      distance: Int): Board = {
+    (layerIndex, placeIndex) match {
+      case (None, None) =>
+        val targetPosition = targetIndex(playerId, None, distance)
+        moveMonkeys(
+          monkeyStarts(playerId).take(monkeyCount),
+          None, Some(targetPosition))
+      case (Some(l: Int), Some(p: Int)) =>
+        val targetPosition = targetIndex(playerId, Some((l, p)), distance)
+        moveMonkeys(
+          layers(l)(p).monkeys.filter(m => m.playerId == playerId).take(monkeyCount),
+          Some((l, p)), Some(targetPosition))
+      case _ =>
+        throw new IllegalArgumentException("invalid move")
     }
-    moveMonkeys(monkeys, (layerIndex, placeIndex), targetPosition)
   }
 
   private def makeMove(move: Move): Board = {
@@ -281,24 +322,29 @@ case class Board(gameId: String,
         if(isMovable(List(monkeyStarts(playerId).head),
           layers(0).find(_.slideDown == Some(playerId)).getOrElse(
             throw new IllegalStateException("couldn't find start place for monkey")))) {
-          List(Move(playerId, -1, -1, 1, List(1)))
+          List(Move(playerId, None, None, 1, List(1)))
         } else List()
     } else List()
     val moveAllOne: List[Move] = layers.zipWithIndex.reverse.flatMap(layerTuple =>
       layerTuple._1.zipWithIndex.
         filter(_._1.monkeys.count(_.playerId == playerId) > 0).reverse.
-        map {
+        flatMap {
           placeTuple =>
             val monkeys = placeTuple._1.monkeys.filter(_.playerId == playerId)
-            (for(monkey <- monkeys; move = Move(playerId, layerTuple._2, placeTuple._2, 1, List(1))) yield move).toList
-        }).flatten.toList
+            (for(monkey <- monkeys; move =
+            Move(playerId, Some(layerTuple._2), Some(placeTuple._2), 1, List(1))) yield move).toList
+        }).toList
     val moves: List[Move] = moveOneOn ++ moveAllOne
     makePossibleMoves(moves)
   }
 
   private def makePossibleMoves(moves: List[Move]): Board = {
     if(moves.length >= 1) {
-      val target = targetIndex(moves.head.playerId, (moves.head.layerIndex, moves.head.placeIndex), moves.head.distance.sum)
+      val target =
+        targetIndex(
+          moves.head.playerId,
+          (moves.head.layerIndex, moves.head.placeIndex).bisequence[Option, Int, Int],
+          moves.head.distance.sum)
       if (!isMovable(moves.head.playerId, moves.head.monkeyCount, layers(target._1)(target._2))) {
         makePossibleMoves(moves.tail)
       } else {
@@ -330,13 +376,14 @@ case class Board(gameId: String,
         }
         val remainingDecisions = diceDecisions.tail
         val remainingDice = extractDice(decision, diceRolls)
-        if ((diceRolls.length > diceCount && !diceRolls.forall(_ == 1)) ||
-          (remainingDice.nonEmpty && remainingDice.length == diceRolls.length)) {
-          throw new IllegalStateException("illegal move")
-        } else if (remainingDecisions.nonEmpty) {
-          makeMove(decision).consumeDice(remainingDecisions, remainingDice)
-        } else {
+        if (diceRolls.length > diceCount && !diceRolls.forall(_ == 1)) {
+          throw new IllegalStateException("cannot move more monkeys than the number of dice")
+        } else if(remainingDice.nonEmpty && remainingDice.length == diceRolls.length) {
+          throw new IllegalStateException("dice have not been consumed")
+        } else if (remainingDecisions.isEmpty) {
           makeMove(decision).resolveBumps().incrementTurn()
+        } else {
+          makeMove(decision).consumeDice(remainingDecisions, remainingDice)
         }
       }
     }

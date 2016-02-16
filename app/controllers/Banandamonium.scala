@@ -14,14 +14,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Random
 
-class Application @Inject() (val reactiveMongoApi: ReactiveMongoApi)
+class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
   extends Controller with MongoController with ReactiveMongoComponents {
 
   import JsonFormatters._
 
-  val boardsCollection: JSONCollection = db.collection[JSONCollection]("boards")
-  val diceRollsCollection: JSONCollection = db.collection[JSONCollection]("diceRolls")
-  val turnsCollection: JSONCollection = db.collection[JSONCollection]("turns")
+  def boardsCollection: JSONCollection = db.collection[JSONCollection]("boards")
+  def diceRollsCollection: JSONCollection = db.collection[JSONCollection]("diceRolls")
+  def turnsCollection: JSONCollection = db.collection[JSONCollection]("turns")
   val r = new Random()
 
   private def dropBoardState(id: String): Future[Result] = {

@@ -3,14 +3,14 @@
 # ~~~~
 
 # Home page
-POST    /move/:id/:playerId         @controllers.Application.move(id: String, playerId: Int)
-GET     /newBoard/:id               @controllers.Application.createBoard(id: String, playerCount: Int ?= 4, diceCount: Int ?= 2, maxStack: Int ?= 2)
-GET     /boards/:id/:turnIndex      @controllers.Application.getBoard(id: String, turnIndex: Int)
-GET     /boards/:id                 @controllers.Application.getBoards(id: String)
-GET     /roll/:id/:turnIndex        @controllers.Application.roll(id: String, turnIndex: Int)
-GET     /rolls/:id                  @controllers.Application.getRolls(id: String)
-GET     /play/:gameId/:playerId     @controllers.Application.index(gameId: String, playerId: Int)
-GET     /healthcheck                @controllers.Application.healthcheck
-DELETE  /boards/:id                 @controllers.Application.dropBoard(id: String)
+POST    /move/:id/:playerId         @controllers.Banandamonium.move(id: String, playerId: Int)
+GET     /newBoard/:id               @controllers.Banandamonium.createBoard(id: String, playerCount: Int ?= 4, diceCount: Int ?= 2, maxStack: Int ?= 2)
+GET     /boards/:id/:turnIndex      @controllers.Banandamonium.getBoard(id: String, turnIndex: Int)
+GET     /boards/:id                 @controllers.Banandamonium.getBoards(id: String)
+GET     /roll/:id/:turnIndex        @controllers.Banandamonium.roll(id: String, turnIndex: Int)
+GET     /rolls/:id                  @controllers.Banandamonium.getRolls(id: String)
+GET     /play/:gameId/:playerId     @controllers.Banandamonium.index(gameId: String, playerId: Int)
+GET     /healthcheck                @controllers.Banandamonium.healthcheck
+DELETE  /boards/:id                 @controllers.Banandamonium.dropBoard(id: String)
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               @controllers.Assets.at(path="/public", file)

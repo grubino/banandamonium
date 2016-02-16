@@ -143,7 +143,7 @@ function init(spriteSheetImages, $) {
                     sprite.y = this.starts[i].y;
                     sprite.scaleX = sprite.scaleY = game_settings.spriteScale;
                     sprite.bananaData = {
-                        color: i, layer: -1, index: -1
+                        color: i
                     };
                     sprite.play();
                     this.spriteContainer.addChild(sprite);
@@ -214,7 +214,7 @@ function init(spriteSheetImages, $) {
             if(sprite.bananaData.tweenedSprite === undefined) {
                 sprite.bananaData.tweenedSprite = createjs.Tween.get(sprite);
             }
-            if(sprite.bananaData.index === -1) {
+            if(sprite.bananaData.index === undefined) {
                 return this.bringOnBoard(sprite, checkBumps);
             }
             var index = sprite.bananaData.index, layer = sprite.bananaData.layer, color = sprite.bananaData.color;
@@ -263,7 +263,7 @@ function init(spriteSheetImages, $) {
                 sprite.bananaData.tweenedSprite = createjs.Tween.get(sprite);
             }
             var tweenedSprite = sprite.bananaData.tweenedSprite;
-            if(layer === -1 && index === -1) {
+            if(layer === undefined && index === undefined) {
                 var color = sprite.bananaData.color;
                 tweenedSprite = tweenedSprite.to({
                     x: this.starts[color].x,
@@ -324,7 +324,7 @@ function init(spriteSheetImages, $) {
     var boardView = new BoardView(board, spriteSheetData, stage);
 
     for(var i = 0; i < boardView.board.playerCount*game_settings.monkeyCount; i++) {
-        if (!boardView.moveMonkey(i%boardView.board.playerCount, -1, -1, Math.round(30*Math.random()+1))) {
+        if (!boardView.moveMonkey(i%boardView.board.playerCount, undefined, undefined, Math.round(30*Math.random()+1))) {
             console.log("couldn't move monkey!");
         }
     }

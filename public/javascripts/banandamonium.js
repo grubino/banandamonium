@@ -295,7 +295,7 @@ function createBoardView(gameId, playerId) {
                     sprite.y = this.starts[i].y + j*Math.round(20*(Math.sin(i * 2 * Math.PI / this.model.get('playerCount'))));
                     sprite.scaleX = sprite.scaleY = game_settings.spriteScale;
                     sprite.bananaData = {
-                        color: i, layer: -1, index: -1, stackSize: 1,
+                        color: i, stackSize: 1,
                         monkeyId: this.model.get('monkeyStarts')[i][j].monkeyId
                     };
                     sprite.addEventListener("click", this.combineSprites.bind(this));
@@ -418,7 +418,7 @@ function createBoardView(gameId, playerId) {
             if(sprite.bananaData.tweenedSprite === undefined) {
                 sprite.bananaData.tweenedSprite = createjs.Tween.get(sprite);
             }
-            if(sprite.bananaData.index === -1 && sprite.bananaData.layer === -1) {
+            if(sprite.bananaData.index === undefined && sprite.bananaData.layer === undefined) {
                 nextMove.layer = 1;
                 nextMove.index = layers[1].findIndex(
                     function(place) { return place.slideDown === color; });
@@ -474,7 +474,7 @@ function createBoardView(gameId, playerId) {
             }
             var tweenedSprite = this.prepareSpriteToMove(sprite);
             var color = sprite.bananaData.color;
-            if(layer === -1 && index === -1) {
+            if(layer === undefined && index === undefined) {
                 tweenedSprite = tweenedSprite.to({
                     x: this.starts[color].x,
                     y: this.starts[color].y
@@ -493,7 +493,7 @@ function createBoardView(gameId, playerId) {
             var deltaX;
             var deltaY;
 
-            if(startMove.layer === -1 && startMove.index === -1) {
+            if(startMove.layer === undefined && startMove.index === undefined) {
                 deltaX = subIndexX - this.starts[color].x;
                 deltaY = subIndexY - this.starts[color].y;
             } else {
@@ -530,7 +530,7 @@ function createBoardView(gameId, playerId) {
         _onNewBoardState: function(newBoard, boards) {
             this.unhighlighSprites();
             this.sprites.forEach(function(sprite) {
-                if(sprite.bananaData.layer === -1 && sprite.bananaData.index === -1) {
+                if(sprite.bananaData.layer === undefined && sprite.bananaData.index === undefined) {
                     if(newBoard.get('monkeyStarts')[sprite.bananaData.color].findIndex(
                         function(monkey) {
                             return monkey.monkeyId === sprite.bananaData.monkeyId;
@@ -567,7 +567,7 @@ function createBoardView(gameId, playerId) {
                         }
                     }
                 }
-                this.moveMonkeyTo(sprite, -1, -1, -1);
+                this.moveMonkeyTo(sprite, undefined, undefined, undefined);
             }, this);
             this.model = newBoard;
         }
