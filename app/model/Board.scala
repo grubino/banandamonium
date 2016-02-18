@@ -312,7 +312,10 @@ case class Board(gameId: String,
 
   def winner(): Int = {
     val winners: IndexedSeq[Boolean] =
-      for(i <- 0 to playerCount-1; won = checkWinCondition(i)) yield won;
+      for {
+        i <- 0 until playerCount
+        won = checkWinCondition(i)
+      } yield won
     winners.indexWhere(_ == true)
   }
 
@@ -330,9 +333,10 @@ case class Board(gameId: String,
         filter(_._1.monkeys.count(_.playerId == playerId) > 0).reverse.
         flatMap {
           placeTuple =>
-            val monkeys = placeTuple._1.monkeys.filter(_.playerId == playerId)
-            (for(monkey <- monkeys; move =
-            Move(playerId, Some(layerTuple._2), Some(placeTuple._2), 1, List(1))) yield move).toList
+            for {
+              monkey <- placeTuple._1.monkeys if monkey.playerId == playerId
+              move = Move(playerId, Some(layerTuple._2), Some(placeTuple._2), 1, List(1))
+            } yield move
         }).toList
     val moves: List[Move] = moveOneOn ++ moveAllOne
     makePossibleMoves(moves)
@@ -357,7 +361,10 @@ case class Board(gameId: String,
 
   def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
     val winners: IndexedSeq[Boolean] =
-      for(i <- 0 to playerCount-1; won = checkWinCondition(i)) yield won;
+      for {
+        i <- 0 until playerCount
+        won = checkWinCondition(i)
+      } yield won
     if(winners.count(_ == true) == 1) {
       this
     } else if(winners.count(_ == true) > 1) {
@@ -397,23 +404,29 @@ case class Board(gameId: String,
 
 object MonkeyStartGenerator {
   def generateMonkeyStarts(playerCount: Int, monkeyCount: Int): List[List[Monkey]] = {
-    (for(i <- 0 to playerCount-1;
-      monkeys = (for(j <- 1 to monkeyCount; monkey = Monkey(i, i*100+j)) yield monkey).toList) yield monkeys).toList
+    (for{
+      i <- 0 until playerCount
+      monkeys = (for {
+        j <- 1 to monkeyCount
+        monkey = Monkey(i, i*100+j)
+      } yield monkey).toList
+    } yield monkeys).toList
   }
 }
 
 object LayerGenerator {
+  val layerCount = 6
   def generateLayers(playerCount: Int): Vector[Vector[Place]] = {
-    (for(
-      i <- 0 to 5;
-      layer = if(i < 5) generateLayer(playerCount, i) else Vector(Place(List(), None, None))
-    ) yield layer).toVector
+    (for {
+      i <- 0 until layerCount
+      layer = if (i < 5) generateLayer(playerCount, i) else Vector(Place(List(), None, None))
+    } yield layer).toVector
   }
   private def generateLayer(playerCount: Int, layerIndex: Int): Vector[Place] = {
-    (for(
-      i <- 1 to playerCount * sideLength(layerIndex);
-      place = Place(List(), getSlideUp(playerCount, layerIndex, i-1), getSlideDown(playerCount, layerIndex, i-1))
-    ) yield place).toVector
+    (for {
+      i <- 0 until playerCount * sideLength(layerIndex)
+      place = Place(List(), getSlideUp(playerCount, layerIndex, i), getSlideDown(playerCount, layerIndex, i))
+    } yield place).toVector
   }
   private def getSlideUp(playerCount: Int, layerIndex: Int, placeIndex: Int): Option[Int] = {
     getSlideDown(playerCount, layerIndex, placeIndex+1)
@@ -433,6 +446,7 @@ object LayerGenerator {
       case 3 => 3
       case 4 => 2
       case 5 => 0
+      case _ => throw new IllegalStateException("layer index out of range")
     }
   }
 }
