@@ -100,65 +100,53 @@ function createBoardView(gameId, playerId) {
             this.stage.update();
         },
 
-        finishAssignDie: function(event) {
-            var sprite = this.spriteContainer.getObjectUnderPoint(event.currentTarget.x, event.currentTarget.y, 0);
+        finishAssignDie: function(event, dieHole) {
+            var sprite = this.spriteContainer.children.find(function(e) {
+                return e.bananaData.monkeyId === dieHole.data("monkeyId");
+            });
             if(sprite && sprite.bananaData.color === playerId) {
                 var move = {
                     playerId: playerId,
                     layerIndex: sprite.bananaData.layer,
                     placeIndex: sprite.bananaData.index,
-                    monkeyCount: sprite.bananaData.stackSize,
-                    distance: event.currentTarget.bananaData.dieValue
+                    monkeyCount: event.draggable.data("monkeyCount"),
+                    distance: [parseInt(event.draggable[0].innerText)]
                 };
-                sprite.bananaData.stackSize = 1;
                 this.turn.moves.push(move);
-                this.dice.removeChild(event.currentTarget);
-                if(this.dice.numChildren === 0) {
+                event.draggable.remove();
+                if($(".die").length === 0) {
                     this.executeMove();
                 }
             }
-            var die = this.dice.getObjectUnderPoint(event.currentTarget.x, event.currentTarget.y, 0);
-            if(die) {
-                this.createDie(
-                    die.parent.bananaData.dieValue.concat(event.currentTarget.bananaData.dieValue),
-                    die.parent.bananaData.dieIndex);
-                this.dice.removeChild(die.parent, event.currentTarget);
-            }
         },
 
-        createDie: function(dieVal, i) {
-            var bg = new createjs.Shape();
-            bg.graphics.beginFill("red").drawRoundRect(
-                0, 0, game_settings.width/20, game_settings.height/20, 5);
-            var label = new createjs.Text(dieVal, "bold "+game_settings.height/20+"px Fixed", "#ffffff");
-            label.textAlign = "center";
-            label.textBaseline = "center";
-            label.x = game_settings.width/40;
-            label.y = game_settings.height/40+10;
-            var button = new createjs.Container();
-            button.x = 20 + game_settings.width/10 + i*game_settings.width/20;
-            button.y = 20;
-            button.addChild(bg, label);
-            button.bananaData = {dieValue: dieVal, dieIndex: i};
-            button.on("pressmove", this.startAssignDie.bind(this));
-            button.on("pressup", this.finishAssignDie.bind(this));
-            this.dice.addChild(button);
+        createDie: function(i, dieVal) {
+            var die = $('<div id="die-' + i + '-button" class="die combine">'+dieVal+'</div>');
+            return die.draggable({
+                appendTo: "#game-canvas",
+                containment: "#game-canvas",
+                label: dieVal,
+                snap: ".combine",
+                snapMode: "inner"
+            });
+        },
+
+        createDieHole: function(i) {
+            var dieHole = $('<div id="die-hole-' + i + '" class="combine diehole arrow-down"></div>');
+            dieHole.data("monkeyId", i);
+            return dieHole.droppable({
+                accept: '.combine',
+                drop: function(ui, event) {
+                    this.finishAssignDie(event, dieHole);
+                }.bind(this)
+            });
         },
 
         createAdvanceAllButton: function() {
-            var bg = new createjs.Shape();
-            bg.graphics.beginFill("red").drawRoundRect(
-                0, 0, game_settings.width/20, game_settings.height/20, 5);
-            var label = new createjs.Text("*", "bold "+game_settings.height/20+"px Fixed", "#ffffff");
-            label.textAlign = "center";
-            label.textBaseline = "center";
-            label.x = game_settings.width/40;
-            label.y = game_settings.height/40+10;
-            var button = new createjs.Container();
-            button.x = 20;
-            button.y = game_settings.height/10;
-            button.addChild(bg, label);
-            return button;
+            var button = $('<button id="advance-all-button" class="die"></button>').button({
+                label: "Advance All"
+            });
+            return button.click(this.moveAllTurn);
         },
 
         unhighlighSprites: function() {
@@ -168,28 +156,41 @@ function createBoardView(gameId, playerId) {
         },
 
         highlightSprites: function() {
-            this.sprites.forEach(function(sprite) {
+            this.sprites.forEach(function(sprite, i) {
                 if(sprite.bananaData.color === this.model.get('currentPlayer')) {
+                    var dieHole = this.createDieHole(sprite.bananaData.monkeyId);
+                    $("#dice-box").append(dieHole);
+                    var canvasRect = this.el.getBoundingClientRect();
+                    dieHole.css("left", sprite.x - canvasRect.left);
+                    dieHole.css("top", sprite.y + canvasRect.top);
+                    function animateDieHole() {
+                        dieHole.animate({top: "-=10"}, 1000,
+                            dieHole.animate.bind(dieHole, {top: "+=10"}, 1000, animateDieHole));
+                    }
+                    animateDieHole();
+
                     sprite.gotoAndPlay("wave");
                 }
             }, this);
         },
 
         postRoll: function(roll) {
-            if(this.dice) {
-                this.dice.removeAllChildren();
-            }
-            this.dice = new createjs.Container();
+            $('.die').remove();
+            $('.diehole').remove();
             this.turn = {playerIndex: playerId, gameId: gameId, moves: [], bananaCards: []};
-            roll.diceRolls.map(function(roll) { return [roll]; }).forEach(this.createDie, this);
             if(roll.diceRolls.filter(function(dr) { return dr == 1; }).length === roll.diceRolls.length) {
-                this.advanceAll = new createjs.Container();
-                this.advanceAll.addChild(this.createAdvanceAllButton());
-                this.advanceAll.addEventListener("click", this.moveAllTurn.bind(this));
-                this.stage.addChild(this.advanceAll);
+                var advanceAllButton = this.createAdvanceAllButton();
+                $('#dice-box').append(advanceAllButton);
             }
+
+            roll.diceRolls.forEach(function(r, i) {
+                var die = this.createDie(i, r);
+                die.data("monkeyCount", 1);
+                $('#dice-box').append(die);
+            }, this);
+
             this.highlightSprites();
-            this.stage.addChild(this.dice);
+
         },
 
         moveAllTurn: function() {
@@ -198,7 +199,8 @@ function createBoardView(gameId, playerId) {
         },
 
         executeMove: function() {
-            this.dice.removeAllChildren();
+            $('.die').remove();
+            $('.diehole').remove();
             $.ajax({
                 cache: false,
                 url: '/move/'+gameId+'/'+playerId,
@@ -207,7 +209,7 @@ function createBoardView(gameId, playerId) {
                 data: JSON.stringify(this.turn),
                 type: "POST",
                 error: function(response, status, error) { alert("could not move: "+JSON.stringify(response)); },
-            })
+            });
         },
 
         rollDice: function(event) {
@@ -230,20 +232,10 @@ function createBoardView(gameId, playerId) {
 
             var limitingDimension = Math.min(game_settings.width, game_settings.height);
 
-            var rollButton = new createjs.Shape();
-            rollButton.graphics.beginFill("red").drawRoundRect(0, 0, game_settings.width/8, game_settings.height/18, 10);
-            var label = new createjs.Text("Roll Dice", "bold "+game_settings.height/50+"px Fixed", "#ffffff");
-            label.textAlign = "center";
-            label.textBaseline = "center";
-            label.x = game_settings.width/20;
-            label.y = game_settings.height/40 + 5;
-
-            this.rollButton = new createjs.Container();
-            this.rollButton.x = 20;
-            this.rollButton.y = 20;
-            this.rollButton.addChild(rollButton, label);
-            this.rollButton.on("click", this.rollDice.bind(this));
-            this.stage.addChild(this.rollButton);
+            this.rollButton = $("#roll-dice-button").button({
+                label: "Roll Dice"
+            });
+            this.rollButton.click(this.rollDice.bind(this));
 
             for(var i = 0; i < this.model.get('playerCount'); i++) {
                 var coord = this._getPolygonVertex((limitingDimension / 2) - this.spriteSize.height, i);

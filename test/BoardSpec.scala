@@ -64,5 +64,37 @@ class BoardSpec extends Specification {
     "prevent monkey stacking higher than maxStack" in {
       testBoard.consumeDice(List(Move(0, None, None, 3, List(2, 2, 2))), List(2, 2, 2)) must throwAn[IllegalStateException]
     }
+    "allow monkeytalk to move a single monkey forward" in {
+      val lingo = new MonkeyTalk(
+        testBoard.consumeDice(List(Move(0, None, None, 1, List(2, 3))), List(2, 3)),
+        Map("aColor" -> 0, "layer" -> 1, "place" -> 4))
+      val newBoard = lingo.parseAll(lingo.monkeyExpr, "move (aColor:layer:place:1, 3)")
+      newBoard.map {
+        b =>
+          b.layers(1)(4).monkeys must haveLength(0)
+          b.layers(1)(7).monkeys must haveLength(1)
+      }.getOrElse(throw new IllegalStateException("parser did not return a board"))
+    }
+    "allow monkeytalk to move several monkeys forward" in {
+      val lingo = new MonkeyTalk(
+        testBoard.consumeDice(List(Move(0, None, None, 1, List(1)), Move(0, None, None, 1, List(1))), List(1, 1)),
+        Map("aColor" -> 0, "layer" -> 1, "place" -> 0))
+      val newBoard = lingo.parseAll(lingo.monkeyExpr, "move (aColor:layer:place:1, 3), (aColor:layer:place:1, 3)")
+      newBoard.map {
+        b =>
+          b.layers(1)(3).monkeys must haveLength(2)
+      }.getOrElse(throw new IllegalStateException("parser did not return a board"))
+    }
+    "allow monkeytalk to move all monkeys forward" in {
+      val lingo = new MonkeyTalk(
+        testBoard.consumeDice(List(Move(0, None, None, 1, List(2)), Move(0, None, None, 1, List(1))), List(2, 1)),
+        Map("aColor" -> 0, "layer" -> 1, "place" -> 0))
+      val newBoard = lingo.parseAll(lingo.monkeyExpr, "move (aColor:*:*:1, 3)")
+      newBoard.map {
+        b =>
+          b.layers(1)(1).monkeys must haveLength(1)
+          b.layers(1)(2).monkeys must haveLength(1)
+      }.getOrElse(throw new IllegalStateException("parser did not return a board"))
+    }
   }
 }

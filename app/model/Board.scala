@@ -268,6 +268,10 @@ case class Board(gameId: String,
 
   }
 
+  def swapMonkeys(first: (Int, Int, Int), second: (Int, Int, Int)): Board = {
+    return this
+  }
+
   private def advance(playerId: Int,
                       layerIndex: Option[Int],
                       placeIndex: Option[Int],
@@ -319,16 +323,8 @@ case class Board(gameId: String,
     winners.indexWhere(_ == true)
   }
 
-  private def advanceAll(playerId: Int): Board = {
-    val moveOneOn: List[Move] =
-      if(monkeyStarts(currentPlayer).length > 0) {
-        if(isMovable(List(monkeyStarts(playerId).head),
-          layers(0).find(_.slideDown == Some(playerId)).getOrElse(
-            throw new IllegalStateException("couldn't find start place for monkey")))) {
-          List(Move(playerId, None, None, 1, List(1)))
-        } else List()
-    } else List()
-    val moveAllOne: List[Move] = layers.zipWithIndex.reverse.flatMap(layerTuple =>
+  def allMove(playerId: Int, distance: Int): List[Move] = {
+    layers.zipWithIndex.reverse.flatMap(layerTuple =>
       layerTuple._1.zipWithIndex.
         filter(_._1.monkeys.count(_.playerId == playerId) > 0).reverse.
         flatMap {
@@ -338,11 +334,23 @@ case class Board(gameId: String,
               move = Move(playerId, Some(layerTuple._2), Some(placeTuple._2), 1, List(1))
             } yield move
         }).toList
+  }
+
+  private def advanceAll(playerId: Int): Board = {
+    val moveOneOn: List[Move] =
+      if(monkeyStarts(currentPlayer).length > 0) {
+        if(isMovable(List(monkeyStarts(playerId).head),
+          layers(0).find(_.slideDown == Some(playerId)).getOrElse(
+            throw new IllegalStateException("couldn't find start place for monkey")))) {
+          List(Move(playerId, None, None, 1, List(1)))
+        } else List()
+    } else List()
+    val moveAllOne: List[Move] = allMove(playerId, 1)
     val moves: List[Move] = moveOneOn ++ moveAllOne
     makePossibleMoves(moves)
   }
 
-  private def makePossibleMoves(moves: List[Move]): Board = {
+  def makePossibleMoves(moves: List[Move]): Board = {
     if(moves.length >= 1) {
       val target =
         targetIndex(
@@ -357,6 +365,14 @@ case class Board(gameId: String,
     } else {
       this
     }
+  }
+
+  def slideMonkeysUp(descriptorList: List[(Int, Int, Int, Int)]): Board = {
+    this
+  }
+
+  def slideMonkeysDown(descriptorList: List[(Int, Int, Int, Int)]): Board = {
+    this
   }
 
   def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {

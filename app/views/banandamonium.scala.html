@@ -4,6 +4,7 @@
   <head>
     <script src=@routes.Assets.at("javascripts/create.min.js") type="text/javascript"></script>
     <script src=@routes.Assets.at("javascripts/jquery.min.js") type="text/javascript"></script>
+    <script src=@routes.Assets.at("javascripts/jquery-ui.js") type="text/javascript"></script>
     <script src=@routes.Assets.at("javascripts/underscore-min.js") type="text/javascript"></script>
     <script src=@routes.Assets.at("javascripts/backbone-min.js") type="text/javascript"></script>
     <script src=@routes.Assets.at("javascripts/jquery.ui.touch-punch.min.js") type="text/javascript"></script>
@@ -13,7 +14,7 @@
         layerColors: ["#aa6655", "#afafaf", "#abbf44", "#23421f", "#ab8942", "#010aff", "#ababab"],
         width: window.innerWidth,
         height: window.innerHeight,
-        spriteScale: 1.5,
+        spriteScale: 1.0,
         baseUrl: "http://localhost:9000"
       };
 
@@ -38,9 +39,9 @@
     <link href=@routes.Assets.at("stylesheets/main.css") rel="stylesheet"/>
   </head>
   <body onload="loadGame();">
-    <menu id="game-controls">
-      <div id="roll-container"></div>
-    </menu>
+    <div id="dice-box">
+      <button id="roll-dice-button"></button>
+    </div>
     <canvas id="game-canvas"></canvas>
   </body>
 </html>
