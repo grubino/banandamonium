@@ -223,7 +223,9 @@ case class Board(gameId: String,
       bananaCards)
   }
 
-  private def withUpdatedTargetLayer(monkeys: List[Monkey], end: (Int, Int), newMonkeyStarts: List[List[Monkey]]): Board = {
+  private def withUpdatedTargetLayer(monkeys: List[Monkey],
+                                     end: (Int, Int),
+                                     newMonkeyStarts: List[List[Monkey]]): Board = {
     Board(
       gameId,
       updatedTargetLayer(monkeys, end),
@@ -234,6 +236,29 @@ case class Board(gameId: String,
       turnIndex,
       playerCount,
       awardBananaCard(layers(end._1)(end._2)))
+  }
+
+  def swapMonkeys(first: (Int, Int, Int), second: (Int, Int, Int)): Board = {
+    val startMonkey = layers(first._2)(first._3).monkeys.find(_.playerId == first._1).
+      getOrElse(throw new IllegalArgumentException("cannot swap without source monkey"))
+    val endMonkey = layers(second._2)(second._3).monkeys.find(_.playerId == second._1).
+      getOrElse(throw new IllegalArgumentException("cannot swap without target monkey"))
+    this.withUpdatedStartLayer(
+      List(startMonkey),
+      (first._2, first._3),
+      monkeyStarts
+    ).withUpdatedTargetLayer(
+      List(startMonkey),
+        (second._2, second._3),
+        monkeyStarts
+    ).withUpdatedStartLayer(
+      List(endMonkey),
+      (second._2, second._3),
+      monkeyStarts
+    ).withUpdatedTargetLayer(
+      List(endMonkey),
+      (first._2, first._3),
+      monkeyStarts)
   }
 
   private def moveMonkeys(monkeys: List[Monkey], start: Option[(Int, Int)], end: Option[(Int, Int)]): Board = {
@@ -266,10 +291,6 @@ case class Board(gameId: String,
       }.getOrElse(this)
     }
 
-  }
-
-  def swapMonkeys(first: (Int, Int, Int), second: (Int, Int, Int)): Board = {
-    return this
   }
 
   private def advance(playerId: Int,

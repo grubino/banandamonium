@@ -96,5 +96,19 @@ class BoardSpec extends Specification {
           b.layers(1)(2).monkeys must haveLength(1)
       }.getOrElse(throw new IllegalStateException("parser did not return a board"))
     }
+    "allow monkeytalk to swap two monkeys" in {
+      val lingo = new MonkeyTalk(
+        testBoard.consumeDice(List(Move(0, None, None, 1, List(1)), Move(0, None, None, 1, List(5))), List(1, 5)).
+          consumeDice(List(Move(1, None, None, 1, List(1))), List(1)),
+        Map("aColor" -> 0, "aLayer" -> 1, "aPlace" -> 0, "bColor" -> 1, "bLayer" -> 1, "bPlace" -> 4))
+      val newBoard = lingo.parseAll(lingo.monkeyExpr, "swap aColor:aLayer:aPlace:1 with bColor:bLayer:bPlace:1")
+      newBoard.map {
+        b =>
+          b.layers(1)(0).monkeys must haveLength(1)
+          b.layers(1)(0).monkeys.head.playerId must equalTo(1)
+          b.layers(1)(4).monkeys must haveLength(2)
+          b.layers(1)(4).monkeys.filter(_.playerId == 0) must haveLength(2)
+      }.getOrElse(throw new IllegalStateException("parser did not return a board"))
+    }
   }
 }
