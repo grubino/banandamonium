@@ -3,6 +3,9 @@
 # ~~~~
 
 # Home page
+GET     /login                      @controllers.Banandamonium.loginView
+GET     /mainMenu                   @controllers.Banandamonium.createBoardView(playerId: Int)
+
 POST    /move/:id/:playerId         @controllers.Banandamonium.move(id: String, playerId: Int)
 GET     /newBoard/:id               @controllers.Banandamonium.createBoard(id: String, playerCount: Int ?= 4, diceCount: Int ?= 2, maxStack: Int ?= 2)
 GET     /boards/:id/:turnIndex      @controllers.Banandamonium.getBoard(id: String, turnIndex: Int)

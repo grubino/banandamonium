@@ -1,6 +1,8 @@
 package model
 
 import play.api.libs.json.Json
+
+import scala.annotation.tailrec
 import scalaz._
 import syntax.bitraverse._
 import std.option._
@@ -26,13 +28,8 @@ case class Board(gameId: String,
       val layerIndex = pos._1
       val placeIndex = pos._2
       val slideDown = layers(layerIndex)(placeIndex).getSlideDown == playerId
-      val newLayerIndex = if (slideDown) {
-        layerIndex - 1
-      } else {
-        layerIndex
-      }
-      val newPlaceIndex =
-        if (slideDown) {
+      val newLayerIndex = if (slideDown) { layerIndex - 1 } else { layerIndex }
+      val newPlaceIndex = if (slideDown) {
           layers(layerIndex - 1) indexWhere (p => p.getSlideUp == playerId)
         } else {
           ((placeIndex - 1) + layers(layerIndex).length) % layers(layerIndex).length
@@ -70,6 +67,7 @@ case class Board(gameId: String,
     layers.takeRight(2).flatten.map(_.monkeys.count(_.playerId == playerId)).sum >= 5
   }
 
+  @tailrec
   private def targetIndex(playerId: Int, positionTuple: Option[(Int, Int)], distance: Int): (Int, Int) = {
     if(distance == 1) {
       nextIndex(playerId, positionTuple)
@@ -122,11 +120,15 @@ case class Board(gameId: String,
           })
     }
   }
+
+  @tailrec
   private def findMovableForward(monkeys: List[Monkey], location: Option[(Int, Int)]): (Int, Int) = {
     val tryLocation = nextIndex(monkeys.head.playerId, location)
     if(isMovable(monkeys, layers(tryLocation._1)(tryLocation._2))) tryLocation
     else findMovableForward(monkeys, Some(tryLocation))
   }
+
+  @tailrec
   private def findMovableBackward(monkeys: List[Monkey], location: (Int, Int)): (Int, Int) = {
     val tryLocation = prevIndex(monkeys.head.playerId, Some(location))
     if(isMovable(monkeys, layers(location._1)(location._2))) tryLocation
