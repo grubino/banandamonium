@@ -10,6 +10,9 @@ import play.api.libs.json._
 import reactivemongo.play.json._
 import play.modules.reactivemongo.{MongoController, ReactiveMongoApi, ReactiveMongoComponents}
 import reactivemongo.api.ReadPreference
+import reactivemongo.api.commands.{DefaultWriteResult, UpdateWriteResult}
+import reactivemongo.api.indexes.Index
+import reactivemongo.api.indexes.IndexType.{Ascending, Descending}
 import reactivemongo.play.json.collection.JSONCollection
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -24,6 +27,9 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
   import JsonFormatters._
 
   override val mongoApi = reactiveMongoApi
+  override def resolveUser(id: String)(implicit ctx: ExecutionContext): Future[Option[Player]] = {
+    playerCollection.find(Json.obj("userName" -> id)).one[Player]
+  }
   override def loginSucceeded(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result] = {
     Future.successful(Ok)
   }
@@ -34,6 +40,17 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
 
   override def authenticationFailed(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result] = {
     Future.successful(Unauthorized)
+  }
+
+  def createUser = Action.async(parse.json) { implicit request: Request[JsValue] =>
+    val newPlayer = request.body.as[Player]
+    playerCollection.insert(newPlayer).map {
+      case DefaultWriteResult(true, _, _, _, _, _) => Ok(Json.toJson(newPlayer))
+      case err =>
+        InternalServerError(Json.obj("error" -> s"there was an error: ${err.errmsg}"))
+    }.recover {
+      case e: Throwable => InternalServerError(Json.obj("error" -> e.getMessage))
+    }
   }
 
   def generateToken: String = java.util.UUID.randomUUID.toString
@@ -53,7 +70,7 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
         case None => NotFound
       }
     }.recover {
-      case e: Throwable => InternalServerError(e)
+      case e: Throwable => InternalServerError(Json.obj("error" -> e.getMessage))
     }
   }
 
@@ -66,9 +83,22 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     _db
   }
   def boardsCollection: JSONCollection = mongodb.collection[JSONCollection]("boards")
-  def diceRollsCollection: JSONCollection = mongodb.collection[JSONCollection]("diceRolls")
-  def turnsCollection: JSONCollection = mongodb.collection[JSONCollection]("turns")
-  def playerCollection: JSONCollection = mongodb.collection[JSONCollection]("players")
+  lazy val diceRollsCollection: JSONCollection = {
+    val _diceRollsCollection = mongodb.collection[JSONCollection]("diceRolls")
+    _diceRollsCollection.indexesManager.ensure(Index(Seq(("turnIndex", Descending), ("gameId" -> Descending))))
+    _diceRollsCollection
+  }
+  lazy val turnsCollection: JSONCollection = {
+    val _turnsCollection = mongodb.collection[JSONCollection]("turns")
+    _turnsCollection.indexesManager.ensure(
+      Index(Seq(("turnIndex", Descending), ("gameId" -> Descending)), unique = true))
+    _turnsCollection
+  }
+  lazy val playerCollection: JSONCollection = {
+    val _playerCollection = mongodb.collection[JSONCollection]("players")
+    _playerCollection.indexesManager.ensure(Index(Seq(("name", Ascending)), unique = true))
+    _playerCollection
+  }
   val r = new Random()
 
   private def dropBoardState(id: String): Future[Result] = {
