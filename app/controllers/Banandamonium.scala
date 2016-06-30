@@ -46,8 +46,7 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     val newPlayer = request.body.as[Player]
     playerCollection.insert(newPlayer).map {
       case DefaultWriteResult(true, _, _, _, _, _) => Ok(Json.toJson(newPlayer))
-      case err =>
-        InternalServerError(Json.obj("error" -> s"there was an error: ${err.errmsg}"))
+      case err => InternalServerError(Json.obj("error" -> s"there was an error: ${err.errmsg}"))
     }.recover {
       case e: Throwable => InternalServerError(Json.obj("error" -> e.getMessage))
     }
@@ -58,16 +57,20 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     val loginInfo = request.body
     val userName = (loginInfo \ "userName").as[String]
     val password = (loginInfo \ "password").as[String]
-    playerCollection.find(Json.obj("name" -> userName)).one[Player].map { playerMaybe =>
+    playerCollection.find(Json.obj("name" -> userName)).one[Player].flatMap { playerMaybe =>
       playerMaybe match {
         case Some(player) =>
+          // todo - crypto hash the password
           if(player.password == password) {
             val token = generateToken
-            Ok(Json.obj("token" -> token))
+            playerCollection.update(
+              Json.obj("name" -> player.name), Json.obj("$push" -> Json.obj("tokens" -> token))).map { _ =>
+                Ok(Json.obj("token" -> token))
+            }
           } else {
-            Unauthorized
+            Future.successful(Unauthorized)
           }
-        case None => NotFound
+        case None => Future.successful(NotFound)
       }
     }.recover {
       case e: Throwable => InternalServerError(Json.obj("error" -> e.getMessage))

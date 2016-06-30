@@ -165,12 +165,13 @@ case class Board(gameId: String,
 
   }
 
+  @tailrec
   private def resolveBumps(): Board = {
     val overflows = findOverflows()
-    if(overflows.nonEmpty) {
-      resolveBump(overflows.head).resolveBumps()
-    } else {
+    if(overflows.isEmpty) {
       this
+    } else {
+      resolveBump(overflows.head).resolveBumps()
     }
   }
 
@@ -373,20 +374,22 @@ case class Board(gameId: String,
     makePossibleMoves(moves)
   }
 
-  def makePossibleMoves(moves: List[Move]): Board = {
-    if(moves.length >= 1) {
+  @tailrec
+  final def makePossibleMoves(moves: List[Move]): Board = {
+    if(moves.isEmpty) {
+      this
+    } else {
       val target =
         targetIndex(
           moves.head.playerId,
           (moves.head.layerIndex, moves.head.placeIndex).bisequence[Option, Int, Int],
           moves.head.distance.sum)
-      if (!isMovable(moves.head.playerId, moves.head.monkeyCount, layers(target._1)(target._2))) {
-        makePossibleMoves(moves.tail)
+      val possibleMoves = if(isMovable(moves.head.playerId, moves.head.monkeyCount, layers(target._1)(target._2))) {
+        moves
       } else {
-        makeMove(moves.head).makePossibleMoves(moves.tail)
+        moves.tail
       }
-    } else {
-      this
+      makeMove(possibleMoves.head).makePossibleMoves(possibleMoves.tail)
     }
   }
 
@@ -398,7 +401,8 @@ case class Board(gameId: String,
     this
   }
 
-  def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
+  @tailrec
+  final def consumeDice(diceDecisions: List[Move], diceRolls: List[Int]): Board = {
     val winners: IndexedSeq[Boolean] =
       for {
         i <- 0 until playerCount
