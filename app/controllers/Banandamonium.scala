@@ -2,26 +2,106 @@ package controllers
 
 import javax.inject.Inject
 
+import jp.t2v.lab.play2.auth.{AuthElement, LoginLogout}
 import model._
+import model.auth.BananaAuthConfig
 import play.api.mvc._
 import play.api.libs.json._
-import play.modules.reactivemongo.{ReactiveMongoApi, ReactiveMongoComponents, MongoController}
-import reactivemongo.api.{ReadPreference, DefaultDB, MongoConnection, MongoDriver}
-import play.modules.reactivemongo.json.collection._
-import play.modules.reactivemongo.json._
+import reactivemongo.play.json._
+import play.modules.reactivemongo.{MongoController, ReactiveMongoApi, ReactiveMongoComponents}
+import reactivemongo.api.ReadPreference
+import reactivemongo.api.commands.{DefaultWriteResult, UpdateWriteResult}
+import reactivemongo.api.indexes.Index
+import reactivemongo.api.indexes.IndexType.{Ascending, Descending}
+import reactivemongo.play.json.collection.JSONCollection
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
 import scala.util.Random
 
 class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
-  extends Controller with MongoController with ReactiveMongoComponents {
+  extends Controller with MongoController with ReactiveMongoComponents
+    with BananaAuthConfig with LoginLogout with AuthElement {
 
   import JsonFormatters._
 
-  def boardsCollection: JSONCollection = db.collection[JSONCollection]("boards")
-  def diceRollsCollection: JSONCollection = db.collection[JSONCollection]("diceRolls")
-  def turnsCollection: JSONCollection = db.collection[JSONCollection]("turns")
+  override val mongoApi = reactiveMongoApi
+  override def resolveUser(id: String)(implicit ctx: ExecutionContext): Future[Option[Player]] = {
+    playerCollection.find(Json.obj("userName" -> id)).one[Player]
+  }
+  override def loginSucceeded(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result] = {
+    Future.successful(Ok)
+  }
+
+  override def logoutSucceeded(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result] = {
+    Future.successful(NoContent)
+  }
+
+  override def authenticationFailed(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result] = {
+    Future.successful(Unauthorized)
+  }
+
+  def createUser = Action.async(parse.json) { implicit request: Request[JsValue] =>
+    val newPlayer = request.body.as[Player]
+    playerCollection.insert(newPlayer).map {
+      case DefaultWriteResult(true, _, _, _, _, _) => Ok(Json.toJson(newPlayer))
+      case err => InternalServerError(Json.obj("error" -> s"there was an error: ${err.errmsg}"))
+    }.recover {
+      case e: Throwable => InternalServerError(Json.obj("error" -> e.getMessage))
+    }
+  }
+
+  def generateToken: String = java.util.UUID.randomUUID.toString
+  def authenticate = Action.async(parse.json) { implicit request: Request[JsValue] =>
+    val loginInfo = request.body
+    val userName = (loginInfo \ "userName").as[String]
+    val password = (loginInfo \ "password").as[String]
+    playerCollection.find(Json.obj("name" -> userName)).one[Player].flatMap { playerMaybe =>
+      playerMaybe match {
+        case Some(player) =>
+          // todo - crypto hash the password
+          if(player.password == password) {
+            val token = generateToken
+            playerCollection.update(
+              Json.obj("name" -> player.name), Json.obj("$push" -> Json.obj("tokens" -> token))).map { _ =>
+                Ok(Json.obj("token" -> token))
+            }
+          } else {
+            Future.successful(Unauthorized)
+          }
+        case None => Future.successful(NotFound)
+      }
+    }.recover {
+      case e: Throwable => InternalServerError(Json.obj("error" -> e.getMessage))
+    }
+  }
+
+  def loginView = Action {
+    Ok("under construction")
+  }
+
+  lazy val mongodb = {
+    val _db = Await.result(database, 30 seconds)
+    _db
+  }
+  def boardsCollection: JSONCollection = mongodb.collection[JSONCollection]("boards")
+  lazy val diceRollsCollection: JSONCollection = {
+    val _diceRollsCollection = mongodb.collection[JSONCollection]("diceRolls")
+    _diceRollsCollection.indexesManager.ensure(Index(Seq(("turnIndex", Descending), ("gameId" -> Descending))))
+    _diceRollsCollection
+  }
+  lazy val turnsCollection: JSONCollection = {
+    val _turnsCollection = mongodb.collection[JSONCollection]("turns")
+    _turnsCollection.indexesManager.ensure(
+      Index(Seq(("turnIndex", Descending), ("gameId" -> Descending)), unique = true))
+    _turnsCollection
+  }
+  lazy val playerCollection: JSONCollection = {
+    val _playerCollection = mongodb.collection[JSONCollection]("players")
+    _playerCollection.indexesManager.ensure(Index(Seq(("name", Ascending)), unique = true))
+    _playerCollection
+  }
   val r = new Random()
 
   private def dropBoardState(id: String): Future[Result] = {
@@ -130,6 +210,10 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     Ok(views.html.banandamonium(gameId, playerId))
   }
 
+  def createBoardView(playerId: Int) = Action {
+    Ok("under construction")
+  }
+
   def healthcheck = Action {
     Ok("SUCCESS")
   }
@@ -165,4 +249,5 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
       lastError => Created(Json.toJson(newBoard))
     }
   }
+
 }
