@@ -110,5 +110,25 @@ class BoardSpec extends Specification {
           b.layers(1)(4).monkeys.filter(_.playerId == 0) must haveLength(2)
       }.getOrElse(throw new IllegalStateException("parser did not return a board"))
     }
+    "allow monkeytalk to slide monkeys" in {
+      val lingoUp = new MonkeyTalk(
+          testBoard.consumeDice(List(Move(0, None, None, 1, List(1))), List(1)),
+          Map("aColor" -> 0, "aLayer" -> 1, "aPlace" -> 0))
+      val newBoardUp = lingoUp.parseAll(lingoUp.monkeyExpr, "slide aColor:aLayer:aPlace:1 up")
+      newBoardUp.map {
+          b =>
+            b.layers(1)(0).monkeys must haveLength(0)
+            b.layers(2)(0).monkeys must haveLength(1)
+        }.getOrElse(throw new IllegalStateException("parser did not return a board"))
+      val lingoDown = new MonkeyTalk(
+          testBoard.consumeDice(List(Move(0, None, None, 1, List(1))), List(1)),
+          Map("aColor" -> 0, "aLayer" -> 1, "aPlace" -> 0))
+      val newBoardDown = lingoUp.parseAll(lingoUp.monkeyExpr, "slide aColor:aLayer:aPlace:1 down")
+      newBoardDown.map {
+          b =>
+            b.layers(1)(0).monkeys must haveLength(0)
+            b.layers(0)(0).monkeys must haveLength(1)
+        }.getOrElse(throw new IllegalStateException("parser did not return a board"))
+    }
   }
 }

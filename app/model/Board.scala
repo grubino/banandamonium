@@ -10,8 +10,8 @@ import std.tuple._
 import scala.util.Random
 
 /**
- * Created by greg.rubino on 10/2/15.
- */
+  * Created by greg.rubino on 10/2/15.
+  */
 case class Board(gameId: String,
                  layers: Vector[Vector[Place]],
                  monkeyStarts: List[List[Monkey]],
@@ -25,16 +25,20 @@ case class Board(gameId: String,
   private def prevIndex(playerId: Int, positionTuple: Option[(Int, Int)]): (Int, Int) = {
     positionTuple.map[(Int, Int)] {
       pos =>
-      val layerIndex = pos._1
-      val placeIndex = pos._2
-      val slideDown = layers(layerIndex)(placeIndex).getSlideDown == playerId
-      val newLayerIndex = if (slideDown) { layerIndex - 1 } else { layerIndex }
-      val newPlaceIndex = if (slideDown) {
+        val layerIndex = pos._1
+        val placeIndex = pos._2
+        val slideDown = layers(layerIndex)(placeIndex).getSlideDown == playerId
+        val newLayerIndex = if (slideDown) {
+          layerIndex - 1
+        } else {
+          layerIndex
+        }
+        val newPlaceIndex = if (slideDown) {
           layers(layerIndex - 1) indexWhere (p => p.getSlideUp == playerId)
         } else {
           ((placeIndex - 1) + layers(layerIndex).length) % layers(layerIndex).length
         }
-      (newLayerIndex, newPlaceIndex)
+        (newLayerIndex, newPlaceIndex)
     }.getOrElse(throw new IllegalStateException("cannot get prev index"))
   }
 
@@ -44,18 +48,22 @@ case class Board(gameId: String,
         val layerIndex = pos._1
         val placeIndex = pos._2
         val slideUp = layers(layerIndex)(placeIndex).getSlideUp == playerId
-        val newLayerIndex = if(slideUp) { layerIndex+1 } else { layerIndex }
+        val newLayerIndex = if (slideUp) {
+          layerIndex + 1
+        } else {
+          layerIndex
+        }
         val newPlaceIndex =
-          if(slideUp) {
-            if(newLayerIndex < 5) {
+          if (slideUp) {
+            if (newLayerIndex < 5) {
               layers(layerIndex + 1) indexWhere (p => p.getSlideDown == playerId)
-            } else if(newLayerIndex == 5) {
+            } else if (newLayerIndex == 5) {
               0
             } else {
               throw new IllegalArgumentException("inaccessible layer")
             }
-          } else if(layerIndex < 5) {
-            (placeIndex+1)%layers(layerIndex).length
+          } else if (layerIndex < 5) {
+            (placeIndex + 1) % layers(layerIndex).length
           } else {
             throw new IllegalArgumentException("there is nothing beyond the fig tree")
           }
@@ -69,19 +77,19 @@ case class Board(gameId: String,
 
   @tailrec
   private def targetIndex(playerId: Int, positionTuple: Option[(Int, Int)], distance: Int): (Int, Int) = {
-    if(distance == 1) {
+    if (distance == 1) {
       nextIndex(playerId, positionTuple)
     } else {
-      targetIndex(playerId, Some(nextIndex(playerId, positionTuple)), distance-1)
+      targetIndex(playerId, Some(nextIndex(playerId, positionTuple)), distance - 1)
     }
   }
 
   private def canBump(playerId: Int, monkeyCount: Int, place: Place): Boolean = {
-    if(place.monkeys.length + monkeyCount <= maxStack) {
+    if (place.monkeys.length + monkeyCount <= maxStack) {
       true
-    } else if(place.monkeys.forall(_.playerId == playerId)) {
+    } else if (place.monkeys.forall(_.playerId == playerId)) {
       false
-    } else if(place.monkeys.length + monkeyCount == maxStack + 1) {
+    } else if (place.monkeys.length + monkeyCount == maxStack + 1) {
       val playerCounts = for (i: Int <- place.monkeys.map(m => m.playerId).toSet;
                               n = place.monkeys.count(_.playerId == i); if i != playerId) yield n
       playerCounts.sum < (monkeyCount + place.monkeys.count(_.playerId == playerId))
@@ -98,7 +106,7 @@ case class Board(gameId: String,
 
   private def findLayerOverflows(index: Int): List[(Int, Int)] = {
     val layer = layers(index)
-    val layerOverflows = for(
+    val layerOverflows = for (
       placeIndex <- layer.indices;
       overflow = (index, placeIndex)
       if layer(placeIndex).monkeys.length > maxStack) yield overflow
@@ -106,17 +114,19 @@ case class Board(gameId: String,
   }
 
   private def findOverflows(): List[(Int, Int)] = {
-    val overflows = for(layerIndex <- layers.indices;
-                        layerOverflows = findLayerOverflows(layerIndex)) yield layerOverflows
+    val overflows = for (layerIndex <- layers.indices;
+                         layerOverflows = findLayerOverflows(layerIndex)) yield layerOverflows
     overflows.reduce((l, m) => l ++ m)
   }
 
   private def playerLayerStart(monkey: Monkey, layerIndex: Int): Int = {
-    if(layerIndex == -1) -1 else {
+    if (layerIndex == -1) -1
+    else {
       layers(layerIndex).indexWhere(
         place =>
           place.slideDown match {
-            case Some(slide) => slide == monkey.playerId case None => false
+            case Some(slide) => slide == monkey.playerId
+            case None => false
           })
     }
   }
@@ -124,28 +134,28 @@ case class Board(gameId: String,
   @tailrec
   private def findMovableForward(monkeys: List[Monkey], location: Option[(Int, Int)]): (Int, Int) = {
     val tryLocation = nextIndex(monkeys.head.playerId, location)
-    if(isMovable(monkeys, layers(tryLocation._1)(tryLocation._2))) tryLocation
+    if (isMovable(monkeys, layers(tryLocation._1)(tryLocation._2))) tryLocation
     else findMovableForward(monkeys, Some(tryLocation))
   }
 
   @tailrec
   private def findMovableBackward(monkeys: List[Monkey], location: (Int, Int)): (Int, Int) = {
     val tryLocation = prevIndex(monkeys.head.playerId, Some(location))
-    if(isMovable(monkeys, layers(location._1)(location._2))) tryLocation
+    if (isMovable(monkeys, layers(location._1)(location._2))) tryLocation
     else findMovableBackward(monkeys, tryLocation)
   }
 
   private def bump(monkey: Monkey, location: (Int, Int)): Board = {
-    val endLayer = location._1-1
+    val endLayer = location._1 - 1
     val endPlace: Option[(Int, Int)] =
-      if(endLayer >= 0) {
+      if (endLayer >= 0) {
         val firstTry =
           (location._2 * layers(endLayer).length) / layers(location._1).length +
-            (if(location._1 < 5 && layers(location._1).length % layers(endLayer).length != 0) 1
-              else 0)
-        if(location._1 < 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
+            (if (location._1 < 5 && layers(location._1).length % layers(endLayer).length != 0) 1
+            else 0)
+        if (location._1 < 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
           Some(findMovableForward(List(monkey), Some((endLayer, firstTry))))
-        } else if(location._2 >= 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
+        } else if (location._2 >= 4 && !isMovable(List(monkey), layers(endLayer)(firstTry))) {
           Some(findMovableBackward(List(monkey), (endLayer, firstTry)))
         } else {
           Some((endLayer, firstTry))
@@ -168,7 +178,7 @@ case class Board(gameId: String,
   @tailrec
   private def resolveBumps(): Board = {
     val overflows = findOverflows()
-    if(overflows.isEmpty) {
+    if (overflows.isEmpty) {
       this
     } else {
       resolveBump(overflows.head).resolveBumps()
@@ -178,13 +188,14 @@ case class Board(gameId: String,
   private def isMovable(monkeys: List[Monkey], place: Place): Boolean = {
     isMovable(monkeys.head.playerId, monkeys.length, place)
   }
+
   private def isMovable(playerId: Int, monkeyCount: Int, place: Place): Boolean = {
     !(place.monkeys.length == maxStack && !canBump(playerId, monkeyCount, place))
   }
 
   private def updatedTargetLayer(monkeys: List[Monkey], end: (Int, Int)): Vector[Vector[Place]] = {
     val targetPlace = layers(end._1)(end._2)
-    if(!isMovable(monkeys, targetPlace)) {
+    if (!isMovable(monkeys, targetPlace)) {
       throw new IllegalStateException("too many monkeys to one spot")
     }
     val updatedTargetPlace = targetPlace.addMonkeys(monkeys)
@@ -194,7 +205,7 @@ case class Board(gameId: String,
   private def updatedStartLayer(monkeys: List[Monkey], start: (Int, Int)): Vector[Vector[Place]] = {
     val startPlace = layers(start._1)(start._2)
     val playerId = monkeys.head.playerId
-    if(startPlace.monkeys.count(_.playerId == playerId) == 0) {
+    if (startPlace.monkeys.count(_.playerId == playerId) == 0) {
       throw new IllegalStateException("no monkeys to move")
     }
     val updatedStartPlace = startPlace.removeMonkeys(monkeys)
@@ -202,9 +213,9 @@ case class Board(gameId: String,
   }
 
   private def awardBananaCard(landingPlace: Place): BananaCards = {
-    if(bananaCards.deck.nonEmpty) {
+    if (bananaCards.deck.nonEmpty) {
       BananaCards(bananaCards.deck.tail, bananaCards.deck.head :: bananaCards.active, bananaCards.discard)
-    } else if(bananaCards.discard.nonEmpty) {
+    } else if (bananaCards.discard.nonEmpty) {
       val r = new Random
       val shuffled = r.shuffle(bananaCards.discard)
       BananaCards(shuffled.tail, shuffled.head :: bananaCards.active, List())
@@ -241,6 +252,56 @@ case class Board(gameId: String,
       awardBananaCard(layers(end._1)(end._2)))
   }
 
+  def slideMonkeysUp(mCoord: (Int, Int, Int, Int)): Board = {
+    val monkeys = layers(mCoord._2)(mCoord._3).monkeys.filter(_.playerId == mCoord._1)
+    val targetCoord = slideUpCoord((mCoord._2, mCoord._3))
+    if (monkeys.length < mCoord._4) {
+      throw new IllegalArgumentException("not enough monkeys to slide")
+    } else if (!isMovable(monkeys, layers(targetCoord._1)(targetCoord._2))) {
+      throw new IllegalArgumentException("illegal slide")
+    }
+    this.withUpdatedStartLayer(monkeys, (mCoord._2, mCoord._3), monkeyStarts).
+      withUpdatedTargetLayer(monkeys, targetCoord, monkeyStarts).resolveBumps()
+  }
+
+  def slideMonkeysDown(mCoord: (Int, Int, Int, Int)): Board = {
+    val monkeys = layers(mCoord._2)(mCoord._3).monkeys.filter(_.playerId == mCoord._1)
+    if (monkeys.length < mCoord._4) {
+      throw new IllegalArgumentException("not enough monkeys to slide")
+    }
+
+    slideDownCoord(mCoord._2, mCoord._3).bisequence[Option, Int, Int] match {
+      case Some(coord) =>
+        if (!isMovable(monkeys, layers(coord._1)(coord._2))) {
+          throw new IllegalArgumentException("illegal slide")
+        }
+        this.withUpdatedStartLayer(monkeys, (mCoord._2, mCoord._3), monkeyStarts).
+          withUpdatedTargetLayer(monkeys, coord, monkeyStarts).resolveBumps()
+      case None =>
+        this.withUpdatedStartLayer(monkeys, (mCoord._2, mCoord._3),
+          monkeyStarts.updated(mCoord._1, monkeyStarts(mCoord._1) ++
+            layers(mCoord._2)(mCoord._3).monkeys.filter(_.playerId == mCoord._1).take(mCoord._4)))
+    }
+
+  }
+
+  def slideDownCoord(coord: (Int, Int)): (Option[Int], Option[Int]) = {
+    if (coord._1 > 0) {
+      (Some(coord._1 - 1), Some((coord._2 * layers(coord._1 - 1).length) / layers(coord._1).length))
+    } else {
+      (None, None)
+    }
+  }
+
+  def slideUpCoord(coord: (Int, Int)): (Int, Int) = {
+    if (coord._1 < layers.length - 1) {
+      (coord._1 + 1, (coord._2 * layers(coord._1 + 1).length) / layers(coord._1).length)
+    } else {
+      throw new IllegalArgumentException("cannot slide up")
+    }
+  }
+
+
   def swapMonkeys(first: (Int, Int, Int), second: (Int, Int, Int)): Board = {
     val startMonkey = layers(first._2)(first._3).monkeys.find(_.playerId == first._1).
       getOrElse(throw new IllegalArgumentException("cannot swap without source monkey"))
@@ -252,8 +313,8 @@ case class Board(gameId: String,
       monkeyStarts
     ).withUpdatedTargetLayer(
       List(startMonkey),
-        (second._2, second._3),
-        monkeyStarts
+      (second._2, second._3),
+      monkeyStarts
     ).withUpdatedStartLayer(
       List(endMonkey),
       (second._2, second._3),
@@ -266,12 +327,12 @@ case class Board(gameId: String,
 
   private def moveMonkeys(monkeys: List[Monkey], start: Option[(Int, Int)], end: Option[(Int, Int)]): Board = {
 
-    if(monkeys.isEmpty) {
+    if (monkeys.isEmpty) {
       throw new IllegalArgumentException("tried to move no monkeys")
     }
     val playerId = monkeys.head.playerId
 
-    if(!monkeys.forall(_.playerId == playerId)) {
+    if (!monkeys.forall(_.playerId == playerId)) {
       throw new IllegalArgumentException("tried to move multicolored monkeys")
     }
 
@@ -318,7 +379,9 @@ case class Board(gameId: String,
   }
 
   private def makeMove(move: Move): Board = {
-    if(move.monkeyCount > 1 && (move.distance.length != move.monkeyCount || !move.distance.forall(_ == move.distance.head))) {
+    if (move.monkeyCount > 1 &&
+      (move.distance.length != move.monkeyCount ||
+      !move.distance.forall(_ == move.distance.head))) {
       throw new IllegalStateException("illegal move")
     }
     advance(move.playerId, move.layerIndex, move.placeIndex, move.monkeyCount, move.distance.sum)
@@ -326,12 +389,12 @@ case class Board(gameId: String,
 
   private def incrementTurn(): Board = {
     val newCurrentPlayer =
-      if(bananaCards.active.nonEmpty) {
+      if (bananaCards.active.nonEmpty) {
         currentPlayer
       } else {
-        (currentPlayer+1)%playerCount
+        (currentPlayer + 1) % playerCount
       }
-    Board(gameId, layers, monkeyStarts, maxStack, diceCount, newCurrentPlayer, turnIndex+1, playerCount, bananaCards)
+    Board(gameId, layers, monkeyStarts, maxStack, diceCount, newCurrentPlayer, turnIndex + 1, playerCount, bananaCards)
   }
 
   private def extractDice(move: Move, dice: List[Int]): List[Int] = {
@@ -362,13 +425,13 @@ case class Board(gameId: String,
 
   private def advanceAll(playerId: Int): Board = {
     val moveOneOn: List[Move] =
-      if(monkeyStarts(currentPlayer).length > 0) {
-        if(isMovable(List(monkeyStarts(playerId).head),
+      if (monkeyStarts(currentPlayer).length > 0) {
+        if (isMovable(List(monkeyStarts(playerId).head),
           layers(0).find(_.slideDown == Some(playerId)).getOrElse(
             throw new IllegalStateException("couldn't find start place for monkey")))) {
           List(Move(playerId, None, None, 1, List(1)))
         } else List()
-    } else List()
+      } else List()
     val moveAllOne: List[Move] = allMove(playerId, 1)
     val moves: List[Move] = moveOneOn ++ moveAllOne
     makePossibleMoves(moves)
@@ -376,7 +439,7 @@ case class Board(gameId: String,
 
   @tailrec
   final def makePossibleMoves(moves: List[Move]): Board = {
-    if(moves.isEmpty) {
+    if (moves.isEmpty) {
       this
     } else {
       val target =
@@ -384,7 +447,7 @@ case class Board(gameId: String,
           moves.head.playerId,
           (moves.head.layerIndex, moves.head.placeIndex).bisequence[Option, Int, Int],
           moves.head.distance.sum)
-      val possibleMoves = if(isMovable(moves.head.playerId, moves.head.monkeyCount, layers(target._1)(target._2))) {
+      val possibleMoves = if (isMovable(moves.head.playerId, moves.head.monkeyCount, layers(target._1)(target._2))) {
         moves
       } else {
         moves.tail
@@ -394,11 +457,13 @@ case class Board(gameId: String,
   }
 
   def slideMonkeysUp(descriptorList: List[(Int, Int, Int, Int)]): Board = {
-    this
+    if(descriptorList.isEmpty) this
+    else slideMonkeysUp(descriptorList.head).slideMonkeysUp(descriptorList.tail)
   }
 
   def slideMonkeysDown(descriptorList: List[(Int, Int, Int, Int)]): Board = {
-    this
+    if(descriptorList.isEmpty) this
+    else slideMonkeysDown(descriptorList.head).slideMonkeysDown(descriptorList.tail)
   }
 
   @tailrec
@@ -408,13 +473,13 @@ case class Board(gameId: String,
         i <- 0 until playerCount
         won = checkWinCondition(i)
       } yield won
-    if(winners.count(_ == true) == 1) {
+    if (winners.count(_ == true) == 1) {
       this
-    } else if(winners.count(_ == true) > 1) {
+    } else if (winners.count(_ == true) > 1) {
       throw new IllegalStateException("there can be only one!")
     } else {
       if (diceDecisions.isEmpty) {
-        if(diceRolls.forall(_ == 1)) {
+        if (diceRolls.forall(_ == 1)) {
           advanceAll(currentPlayer).resolveBumps().incrementTurn()
         } else {
           this
@@ -428,7 +493,7 @@ case class Board(gameId: String,
         val remainingDice = extractDice(decision, diceRolls)
         if (diceRolls.length > diceCount && !diceRolls.forall(_ == 1)) {
           throw new IllegalStateException("cannot move more monkeys than the number of dice")
-        } else if(remainingDice.nonEmpty && remainingDice.length == diceRolls.length) {
+        } else if (remainingDice.nonEmpty && remainingDice.length == diceRolls.length) {
           throw new IllegalStateException("dice have not been consumed")
         } else if (remainingDecisions.isEmpty) {
           makeMove(decision).resolveBumps().incrementTurn()
@@ -447,11 +512,11 @@ case class Board(gameId: String,
 
 object MonkeyStartGenerator {
   def generateMonkeyStarts(playerCount: Int, monkeyCount: Int): List[List[Monkey]] = {
-    (for{
+    (for {
       i <- 0 until playerCount
       monkeys = (for {
         j <- 1 to monkeyCount
-        monkey = Monkey(i, i*100+j)
+        monkey = Monkey(i, i * 100 + j)
       } yield monkey).toList
     } yield monkeys).toList
   }
@@ -459,28 +524,33 @@ object MonkeyStartGenerator {
 
 object LayerGenerator {
   val layerCount = 6
+
   def generateLayers(playerCount: Int): Vector[Vector[Place]] = {
     (for {
       i <- 0 until layerCount
       layer = if (i < 5) generateLayer(playerCount, i) else Vector(Place(List(), None, None))
     } yield layer).toVector
   }
+
   private def generateLayer(playerCount: Int, layerIndex: Int): Vector[Place] = {
     (for {
       i <- 0 until playerCount * sideLength(layerIndex)
       place = Place(List(), getSlideUp(playerCount, layerIndex, i), getSlideDown(playerCount, layerIndex, i))
     } yield place).toVector
   }
+
   private def getSlideUp(playerCount: Int, layerIndex: Int, placeIndex: Int): Option[Int] = {
-    getSlideDown(playerCount, layerIndex, placeIndex+1)
+    getSlideDown(playerCount, layerIndex, placeIndex + 1)
   }
+
   private def getSlideDown(playerCount: Int, layerIndex: Int, placeIndex: Int): Option[Int] = {
-    if(placeIndex % sideLength(layerIndex) == 0) {
+    if (placeIndex % sideLength(layerIndex) == 0) {
       Option(placeIndex / sideLength(layerIndex) % playerCount)
     } else {
       None
     }
   }
+
   def sideLength(layerIndex: Int): Int = {
     layerIndex match {
       case 0 => 4
