@@ -13,6 +13,7 @@ class BoardSpec extends Specification {
   def testBoard: Board = {
     model.Board(
       "testGame",
+      List(),
       LayerGenerator.generateLayers(4),
       List(
         (for(i <- 0 to 6; monkey = Monkey(0, 10+i)) yield monkey).toList,

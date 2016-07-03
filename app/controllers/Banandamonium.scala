@@ -224,13 +224,13 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
 
   def getTokenBoards = Action.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
-    playerCollection.find(Json.obj("tokens" -> token)).one[Player].map { player =>
+    playerCollection.find(Json.obj("tokens" -> token)).one[Player].flatMap { player =>
       val gameTokens = player.flatMap(_.gameTokens).getOrElse(List())
-      val boards = boardsCollection.find(
+      val boardsFuture = boardsCollection.find(
         Json.obj("tokens" ->
           Json.obj("$elemMatch" ->
             Json.obj("$in" -> gameTokens)))).sort(Json.obj("turnIndex" -> -1)).cursor[Board](ReadPreference.primary).collect[List]()
-      Ok(boards)
+      boardsFuture.map(boards => Ok(Json.toJson(boards)))
     }
   }
 

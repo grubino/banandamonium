@@ -228,6 +228,7 @@ case class Board(gameId: String,
   private def withUpdatedStartLayer(monkeys: List[Monkey], start: (Int, Int), newMonkeyStarts: List[List[Monkey]]): Board = {
     Board(
       gameId,
+      playerTokens,
       updatedStartLayer(monkeys, start),
       newMonkeyStarts,
       maxStack,
@@ -243,6 +244,7 @@ case class Board(gameId: String,
                                      newMonkeyStarts: List[List[Monkey]]): Board = {
     Board(
       gameId,
+      playerTokens,
       updatedTargetLayer(monkeys, end),
       newMonkeyStarts,
       maxStack,
@@ -395,7 +397,7 @@ case class Board(gameId: String,
       } else {
         (currentPlayer + 1) % playerCount
       }
-    Board(gameId, layers, monkeyStarts, maxStack, diceCount, newCurrentPlayer, turnIndex + 1, playerCount, bananaCards)
+    Board(gameId, playerTokens, layers, monkeyStarts, maxStack, diceCount, newCurrentPlayer, turnIndex + 1, playerCount, bananaCards)
   }
 
   private def extractDice(move: Move, dice: List[Int]): List[Int] = {
