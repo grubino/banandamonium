@@ -5,6 +5,7 @@
 # Home page
 GET     /login                      @controllers.Banandamonium.loginView
 GET     /mainMenu                   @controllers.Banandamonium.createBoardView(playerId: Int)
+GET     /boards                     @controllers.Banandamonium.getTokenBoards
 POST    /users                      @controllers.Banandamonium.createUser
 POST    /users/login                @controllers.Banandamonium.authenticate
 POST    /move/:id/:playerId         @controllers.Banandamonium.move(id: String, playerId: Int)

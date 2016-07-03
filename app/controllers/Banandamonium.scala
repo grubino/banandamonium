@@ -222,6 +222,18 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     dropBoardState(id)
   }
 
+  def getTokenBoards = Action.async { implicit request =>
+    val token = request.headers.get("Authorization").getOrElse("")
+    playerCollection.find(Json.obj("tokens" -> token)).one[Player].map { player =>
+      val gameTokens = player.flatMap(_.gameTokens).getOrElse(List())
+      val boards = boardsCollection.find(
+        Json.obj("tokens" ->
+          Json.obj("$elemMatch" ->
+            Json.obj("$in" -> gameTokens)))).sort(Json.obj("turnIndex" -> -1)).cursor[Board](ReadPreference.primary).collect[List]()
+      Ok(boards)
+    }
+  }
+
   def getBoard(id: String, turnIndex: Int) = Action.async {
     // TODO - create unique index on {gameId: 1, turnIndex: -1}
     getBoardTurn(id, turnIndex).map {
@@ -240,6 +252,7 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
   def createBoard(id: String, playerCount: Int, diceCount: Int, maxStack: Int) = Action.async {
     val newBoard = Board(
       gameId = id,
+      List[String](),
       layers = LayerGenerator.generateLayers(playerCount),
       monkeyStarts = MonkeyStartGenerator.generateMonkeyStarts(playerCount, 7),
       maxStack = maxStack, diceCount = diceCount, currentPlayer = 0, turnIndex = 0,

@@ -13,6 +13,7 @@ import scala.util.Random
   * Created by greg.rubino on 10/2/15.
   */
 case class Board(gameId: String,
+                 playerTokens: List[String],
                  layers: Vector[Vector[Place]],
                  monkeyStarts: List[List[Monkey]],
                  maxStack: Int,
