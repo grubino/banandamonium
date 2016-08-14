@@ -28,7 +28,7 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
 
   override val mongoApi = reactiveMongoApi
   override def resolveUser(id: String)(implicit ctx: ExecutionContext): Future[Option[Player]] = {
-    playerCollection.find(Json.obj("userName" -> id)).one[Player]
+    playerCollection.find(Json.obj("name" -> id)).one[Player]
   }
   override def loginSucceeded(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result] = {
     Future.successful(Ok)
@@ -64,8 +64,8 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
           if(player.password == password) {
             val token = generateToken
             playerCollection.update(
-              Json.obj("name" -> player.name), Json.obj("$push" -> Json.obj("tokens" -> token))).map { _ =>
-                Ok(Json.obj("token" -> token))
+              Json.obj("name" -> player.name), Json.obj("$push" -> Json.obj("tokens" -> token))).flatMap { _ =>
+                gotoLoginSucceeded(player.name)
             }
           } else {
             Future.successful(Unauthorized)
@@ -140,10 +140,15 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     DiceRolls(gameId, turnIndex, diceRollsInts)
   }
 
-  def roll(id: String, playerId: Int) = Action.async {
+  private def gameParticipant(boardId: String)(account: User): Future[Boolean] = {
+    getCurrentBoard(boardId).map(boardMaybe =>
+      boardMaybe.map(board =>
+        account.gameTokens.map(userTokens => (board.playerTokens.toSet intersect userTokens.toSet).nonEmpty).getOrElse(false)).getOrElse(false))
+  }
+
+  def roll(id: String, playerId: Int) = AsyncStack(AuthorityKey -> gameParticipant(id)) { implicit request =>
     getBoardState(id) flatMap {
       state =>
-        // TODO - create unique index on {gameId: 1, turnIndex: -1}
         val maybeBoard = state._1
         val lastRoll = state._2
         maybeBoard match {
@@ -235,7 +240,6 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
   }
 
   def getBoard(id: String, turnIndex: Int) = Action.async {
-    // TODO - create unique index on {gameId: 1, turnIndex: -1}
     getBoardTurn(id, turnIndex).map {
       case Some(b) => Ok(Json.toJson(b))
       case None => NotFound("board " + id + " at turn " + turnIndex + " not found")
@@ -249,7 +253,13 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     }
   }
 
-  def createBoard(id: String, playerCount: Int, diceCount: Int, maxStack: Int) = Action.async {
+  private def isValidToken(user: User): Future[Boolean] = {
+    Future.successful(true)
+  }
+  def createBoard(id: String,
+                  playerCount: Int,
+                  diceCount: Int,
+                  maxStack: Int) = AsyncStack(AuthorityKey -> isValidToken) { implicit request =>
     val newBoard = Board(
       gameId = id,
       List[String](),

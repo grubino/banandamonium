@@ -6,12 +6,10 @@ import play.api.Environment
 import play.api.libs.json.Json
 import play.api.mvc.{RequestHeader, ResponseHeader, Result, Results}
 import play.modules.reactivemongo.ReactiveMongoApi
-import reactivemongo.play.json.collection.JSONCollection
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect._
 import play.api.libs.json._
-import Function._
 /**
   * Created by greg.rubino on 6/27/16.
   */
