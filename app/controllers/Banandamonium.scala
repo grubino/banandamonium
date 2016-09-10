@@ -65,7 +65,7 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
             val token = generateToken
             playerCollection.update(
               Json.obj("name" -> player.name), Json.obj("$push" -> Json.obj("tokens" -> token))).flatMap { _ =>
-                gotoLoginSucceeded(player.name)
+                Future.successful(Ok(Json.obj("token" -> token)))
             }
           } else {
             Future.successful(Unauthorized)
