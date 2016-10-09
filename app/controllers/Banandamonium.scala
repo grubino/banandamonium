@@ -7,13 +7,13 @@ import model._
 import model.auth.BananaAuthConfig
 import play.api.mvc._
 import play.api.libs.json._
-import reactivemongo.play.json._
 import play.modules.reactivemongo.{MongoController, ReactiveMongoApi, ReactiveMongoComponents}
 import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.{DefaultWriteResult, UpdateWriteResult}
 import reactivemongo.api.indexes.Index
 import reactivemongo.api.indexes.IndexType.{Ascending, Descending}
 import reactivemongo.play.json.collection.JSONCollection
+import reactivemongo.play.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -229,7 +229,7 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
 
   def getTokenBoards = Action.async { implicit request =>
     val token = request.headers.get("Authorization").getOrElse("")
-    playerCollection.find(Json.obj("tokens" -> token)).one[Player].flatMap { player =>
+    playerCollection.find(Json.obj("tokens" -> Json.obj("$elemMatch" -> Json.obj("$eq" -> token)))).one[Player].flatMap { player =>
       val gameTokens = player.flatMap(_.gameTokens).getOrElse(List())
       val boardsFuture = boardsCollection.find(
         Json.obj("tokens" ->

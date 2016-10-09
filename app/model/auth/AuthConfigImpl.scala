@@ -1,6 +1,6 @@
 package model.auth
 
-import jp.t2v.lab.play2.auth.{AuthConfig, AuthenticityToken, TokenAccessor}
+import jp.t2v.lab.play2.auth.{AsyncIdContainer, AuthConfig, AuthenticityToken, TokenAccessor}
 import model.Player
 import play.api.Environment
 import play.api.libs.json.Json
@@ -10,6 +10,7 @@ import play.modules.reactivemongo.ReactiveMongoApi
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect._
 import play.api.libs.json._
+import reactivemongo.play.json.collection.JSONCollection
 /**
   * Created by greg.rubino on 6/27/16.
   */
@@ -45,6 +46,8 @@ trait BananaAuthConfig extends AuthConfig {
   type Authority = User => Future[Boolean]
   val idTag: ClassTag[Id] = classTag[Id]
   val sessionTimeoutInSeconds: Int = 3600
+  val playerCollection: JSONCollection
+  override lazy val idContainer = AsyncIdContainer(new MongoIdContainer(playerCollection))
   def resolveUser(id: Id)(implicit ctx: ExecutionContext): Future[Option[User]]
   def loginSucceeded(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result]
   def logoutSucceeded(request: RequestHeader)(implicit ctx: ExecutionContext): Future[Result]
