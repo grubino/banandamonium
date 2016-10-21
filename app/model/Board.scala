@@ -14,8 +14,7 @@ import scala.util.Random
   */
 case class Board(gameId: String,
                  playerTokens: List[String],
-                 layers: Vector[Vector[Place]],
-                 monkeyStarts: List[List[Monkey]],
+                 monkeys: Map[Monkey, (Int, Int)],
                  maxStack: Int,
                  diceCount: Int,
                  currentPlayer: Int,
@@ -23,80 +22,71 @@ case class Board(gameId: String,
                  playerCount: Int,
                  bananaCards: BananaCards) {
 
-  private def prevIndex(playerId: Int, positionTuple: Option[(Int, Int)]): (Int, Int) = {
-    positionTuple.map[(Int, Int)] {
-      pos =>
-        val layerIndex = pos._1
-        val placeIndex = pos._2
-        val slideDown = layers(layerIndex)(placeIndex).getSlideDown == playerId
-        val newLayerIndex = if (slideDown) {
-          layerIndex - 1
+  val sideLength = List(4, 4, 4, 3, 3, 2, 1)
+  val layerLength = sideLength.map(_ * playerCount)
+  val
+
+  private def layerStart(playerId: Int, layer: Int): Int = playerId * sideLength(layer)
+
+  private def prevIndex(playerId: Int, positionTuple: Option[(Int, Int)]): Option[(Int, Int)] = {
+    positionTuple.flatMap {
+      case (layer, place) =>
+        val atBeginning = place == layerStart(playerId, layer)
+        val newLayerIndex = if (!atBeginning) { Some(layer) } else if (layer > 0) { Some(layer - 1) } else { None }
+        val newPlaceIndex = if (!atBeginning) {
+          Some(layer-1)
+        } else if(layer > 0) {
+          Some((layerStart(playerId, layer-1) + layerLength(layer-1) - 1) % layerLength(layer-1))
         } else {
-          layerIndex
+          None
         }
-        val newPlaceIndex = if (slideDown) {
-          layers(layerIndex - 1) indexWhere (p => p.getSlideUp == playerId)
-        } else {
-          ((placeIndex - 1) + layers(layerIndex).length) % layers(layerIndex).length
-        }
-        (newLayerIndex, newPlaceIndex)
-    }.getOrElse(throw new IllegalStateException("cannot get prev index"))
+        Zip[Option].zip(newLayerIndex, newPlaceIndex)
+    }
   }
 
-  private def nextIndex(playerId: Int, positionTuple: Option[(Int, Int)]): (Int, Int) = {
-    positionTuple.map[(Int, Int)] {
-      pos =>
-        val layerIndex = pos._1
-        val placeIndex = pos._2
-        val slideUp = layers(layerIndex)(placeIndex).getSlideUp == playerId
-        val newLayerIndex = if (slideUp) {
-          layerIndex + 1
+  private def nextIndex(playerId: Int, positionTuple: Option[(Int, Int)]): Option[(Int, Int)] = {
+    positionTuple.map {
+      case (layer, place) =>
+        val atEnd = place == (layerStart(playerId, layer) + layerLength(layer)) % layerLength(layer)
+        val newLayer = if (!atEnd) { Some(layer) } else if (layer < layerLength.length - 1) {
+          Some(layer+1)
         } else {
-          layerIndex
+          None
         }
-        val newPlaceIndex =
-          if (slideUp) {
-            if (newLayerIndex < 5) {
-              layers(layerIndex + 1) indexWhere (p => p.getSlideDown == playerId)
-            } else if (newLayerIndex == 5) {
-              0
-            } else {
-              throw new IllegalArgumentException("inaccessible layer")
-            }
-          } else if (layerIndex < 5) {
-            (placeIndex + 1) % layers(layerIndex).length
-          } else {
-            throw new IllegalArgumentException("there is nothing beyond the fig tree")
-          }
-        (newLayerIndex, newPlaceIndex)
-    }.getOrElse((1, layers.head.indexWhere(p => p.getSlideDown == playerId)))
+        val newPlace = if (!atEnd) { Some(layer) } else if (layer < layerLength.length - 1) {
+          Some(layerStart(playerId, layer+1))
+        } else {
+          None
+        }
+        Zip[Option].zip(newLayer, newPlace)
+    }.getOrElse(Some((0, layerStart(playerId, 0))))
   }
 
-  private def checkWinCondition(playerId: Int): Boolean = {
-    layers.takeRight(2).flatten.map(_.monkeys.count(_.playerId == playerId)).sum >= 5
+  private def checkWinCondition: Option[Int] = {
+    val winners = monkeys.filter { case (monkey, (layer, place)) => layer > (layerLength.length - 2) }
+      .map(_._1).groupBy(_.playerId).filter { case (pId, ms) => ms.size > 5 }
+    if (winners.isEmpty) { None } else if (winners.size == 1) { Some(winners.head._1) } else {
+      throw new Exception("more than one winner")
+    }
   }
 
   @tailrec
-  private def targetIndex(playerId: Int, positionTuple: Option[(Int, Int)], distance: Int): (Int, Int) = {
+  private def targetIndex(playerId: Int, positionTuple: Option[(Int, Int)], distance: Int): Option[(Int, Int)] = {
     if (distance == 1) {
       nextIndex(playerId, positionTuple)
     } else {
-      targetIndex(playerId, Some(nextIndex(playerId, positionTuple)), distance - 1)
+      targetIndex(playerId, nextIndex(playerId, positionTuple), distance - 1)
     }
   }
 
   private def canBump(playerId: Int, monkeyCount: Int, place: Place): Boolean = {
-    if (place.monkeys.length + monkeyCount <= maxStack) {
-      true
-    } else if (place.monkeys.forall(_.playerId == playerId)) {
-      false
-    } else if (place.monkeys.length + monkeyCount == maxStack + 1) {
+    if (place.monkeys.length + monkeyCount <= maxStack) true
+    else if (place.monkeys.forall(_.playerId == playerId)) false
+    else if (place.monkeys.length + monkeyCount == maxStack + 1) {
       val playerCounts = for (i: Int <- place.monkeys.map(m => m.playerId).toSet;
                               n = place.monkeys.count(_.playerId == i); if i != playerId) yield n
       playerCounts.sum < (monkeyCount + place.monkeys.count(_.playerId == playerId))
-    } else {
-      false
-    }
+    } else false
   }
 
   private def canBump(monkeys: List[Monkey], place: Place): Boolean = {
@@ -476,33 +466,29 @@ case class Board(gameId: String,
         i <- 0 until playerCount
         won = checkWinCondition(i)
       } yield won
-    if (winners.count(_ == true) == 1) {
-      this
-    } else if (winners.count(_ == true) > 1) {
-      throw new IllegalStateException("there can be only one!")
-    } else {
-      if (diceDecisions.isEmpty) {
-        if (diceRolls.forall(_ == 1)) {
-          advanceAll(currentPlayer).resolveBumps().incrementTurn()
-        } else {
-          this
-        }
+    if (diceDecisions.isEmpty) {
+      if (diceRolls.forall(_ == 1)) {
+        advanceAll(currentPlayer).resolveBumps().incrementTurn()
       } else {
-        val decision = diceDecisions.head
-        if (decision.playerId != currentPlayer) {
-          throw new IllegalArgumentException("it is not player " + decision.playerId + "'s turn")
-        }
-        val remainingDecisions = diceDecisions.tail
-        val remainingDice = extractDice(decision, diceRolls)
-        if (diceRolls.length > diceCount && !diceRolls.forall(_ == 1)) {
-          throw new IllegalStateException("cannot move more monkeys than the number of dice")
-        } else if (remainingDice.nonEmpty && remainingDice.length == diceRolls.length) {
-          throw new IllegalStateException("dice have not been consumed")
-        } else if (remainingDecisions.isEmpty) {
-          makeMove(decision).resolveBumps().incrementTurn()
-        } else {
-          makeMove(decision).consumeDice(remainingDecisions, remainingDice)
-        }
+        this
+      }
+    } else if (winners.count(_ == true) == 1) {
+      throw new Exception("cannot move after game is over")
+    } else {
+      val decision = diceDecisions.head
+      if (decision.playerId != currentPlayer) {
+        throw new IllegalArgumentException("it is not player " + decision.playerId + "'s turn")
+      }
+      val remainingDecisions = diceDecisions.tail
+      val remainingDice = extractDice(decision, diceRolls)
+      if (diceRolls.length > diceCount && !diceRolls.forall(_ == 1)) {
+        throw new IllegalStateException("cannot move more monkeys than the number of dice")
+      } else if (remainingDice.nonEmpty && remainingDice.length == diceRolls.length) {
+        throw new IllegalStateException("dice have not been consumed")
+      } else if (remainingDecisions.isEmpty) {
+        makeMove(decision).resolveBumps().incrementTurn()
+      } else {
+        makeMove(decision).consumeDice(remainingDecisions, remainingDice)
       }
     }
   }

@@ -143,7 +143,6 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
   def roll(id: String, playerId: Int) = Action.async {
     getBoardState(id) flatMap {
       state =>
-        // TODO - create unique index on {gameId: 1, turnIndex: -1}
         val maybeBoard = state._1
         val lastRoll = state._2
         maybeBoard match {
@@ -229,16 +228,16 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
       val boardsFuture = boardsCollection.find(
         Json.obj("tokens" ->
           Json.obj("$elemMatch" ->
-            Json.obj("$in" -> gameTokens)))).sort(Json.obj("turnIndex" -> -1)).cursor[Board](ReadPreference.primary).collect[List]()
+            Json.obj("$in" -> gameTokens)))).sort(Json.obj("turnIndex" -> -1)).
+        cursor[Board](ReadPreference.primary).collect[List]()
       boardsFuture.map(boards => Ok(Json.toJson(boards)))
     }
   }
 
   def getBoard(id: String, turnIndex: Int) = Action.async {
-    // TODO - create unique index on {gameId: 1, turnIndex: -1}
     getBoardTurn(id, turnIndex).map {
       case Some(b) => Ok(Json.toJson(b))
-      case None => NotFound("board " + id + " at turn " + turnIndex + " not found")
+      case None => NotFound(Json.obj("error" -> s"board ${id} at turn ${turnIndex} not found"))
     }
   }
 
@@ -249,17 +248,21 @@ class Banandamonium @Inject()(val reactiveMongoApi: ReactiveMongoApi)
     }
   }
 
-  def createBoard(id: String, playerCount: Int, diceCount: Int, maxStack: Int) = Action.async {
-    val newBoard = Board(
-      gameId = id,
-      List[String](),
-      layers = LayerGenerator.generateLayers(playerCount),
-      monkeyStarts = MonkeyStartGenerator.generateMonkeyStarts(playerCount, 7),
-      maxStack = maxStack, diceCount = diceCount, currentPlayer = 0, turnIndex = 0,
-      playerCount = playerCount,
-      bananaCards = BananaCards(List(), List(), List()))
-    boardsCollection.insert(newBoard).map {
-      lastError => Created(Json.toJson(newBoard))
+  def createBoard(id: String, playerCount: Int, diceCount: Int, maxStack: Int) = Action.async { request =>
+    request.headers.get("Authorization").map { token =>
+      val newBoard = Board(
+        gameId = id,
+        List[String](token),
+        layers = LayerGenerator.generateLayers(playerCount),
+        monkeyStarts = MonkeyStartGenerator.generateMonkeyStarts(playerCount, 7),
+        maxStack = maxStack, diceCount = diceCount, currentPlayer = 0, turnIndex = 0,
+        playerCount = playerCount,
+        bananaCards = BananaCards(List(), List(), List()))
+      boardsCollection.insert(newBoard).map {
+        lastError => Created(Json.toJson(newBoard))
+      }
+    }.getOrElse {
+      Future.successful(Forbidden(Json.obj("error" -> "you must be logged in")))
     }
   }
 

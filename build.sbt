@@ -13,5 +13,5 @@ libraryDependencies ++= Seq(
   cache,
   ws,
   "jp.t2v"                %% "play2-auth"               % "0.14.2",
-  "org.scalaz"            %% "scalaz-core"              % "7.1.1"
+  "org.scalaz"            %% "scalaz-core"              % "7.2.6"
 )
